@@ -3,7 +3,7 @@ import * as vscode from 'vscode';
 import { configureDesigner } from './designer';
 import { gridData, renderGrid, type GridColumn } from './grid';
 import {
-	deleteResource, duplicateResource, findResourceFamily, listResourceFiles, nextDuplicateKey, readResx, setResource, sortResources,
+	deleteResource, duplicateResources, findResourceFamily, listResourceFiles, planDuplicateKeys, readResx, setResource, sortResources,
 } from './resx';
 import { createResourceFiles, scaffoldResx } from './scaffold';
 import type { XmlEdit } from './xml';
@@ -16,8 +16,8 @@ interface OpenColumn extends GridColumn {
 
 type GridChange =
 	| { type: 'set'; key: string; file: string; value: string }
-	| { type: 'add' | 'duplicate'; key: string }
-	| { type: 'delete'; keys: string[] }
+	| { type: 'add'; key: string }
+	| { type: 'delete' | 'duplicate'; keys: string[] }
 	| { type: 'sort' | 'save' };
 
 function errorText(error: unknown): string {
@@ -52,11 +52,11 @@ function readChange(message: Record<string, unknown>): GridChange {
 	if (type === 'sort' || type === 'save') {
 		return { type };
 	}
-	if (type === 'delete' && Array.isArray(keys) && keys.length && keys.every(key => typeof key === 'string')) {
+	if ((type === 'delete' || type === 'duplicate') && Array.isArray(keys) && keys.length && keys.every(key => typeof key === 'string')) {
 		return { type, keys: [...new Set(keys)] };
 	}
 	if (typeof key === 'string') {
-		if (type === 'duplicate' || (type === 'add' && key.trim())) {
+		if (type === 'add' && key.trim()) {
 			return { type, key };
 		}
 		if (type === 'set' && typeof file === 'string' && typeof value === 'string') {
@@ -73,23 +73,18 @@ function sameResources(first: OpenColumn[], second: OpenColumn[]): boolean {
 	});
 }
 
-async function applyGridChange(columns: OpenColumn[], change: GridChange, neutralUri: vscode.Uri): Promise<string> {
+async function applyGridChange(columns: OpenColumn[], change: GridChange, neutralUri: vscode.Uri): Promise<void> {
 	if (change.type === 'save') {
 		const unsaved: string[] = [];
-		let saved = 0;
 		for (const { document, fileName } of columns) {
-			if (document.isDirty) {
-				if (await document.save()) {
-					saved++;
-				} else {
-					unsaved.push(fileName);
-				}
+			if (document.isDirty && !await document.save()) {
+				unsaved.push(fileName);
 			}
 		}
 		if (unsaved.length) {
 			throw new Error('Could not save ' + unsaved.join(', ') + '.');
 		}
-		return saved ? `Saved ${saved} ${saved === 1 ? 'file' : 'files'}.` : 'No changes to save.';
+		return;
 	}
 
 	if (!columns.length || columns.some(column => !column.resource)) {
@@ -102,13 +97,9 @@ async function applyGridChange(columns: OpenColumn[], change: GridChange, neutra
 		throw new Error('The target file is no longer part of this resource family.');
 	}
 
-	let duplicateKey: string | undefined;
-	if (change.type === 'duplicate') {
-		const keys = new Set(columns.flatMap(column => [...column.resource!.entries.keys()]));
-		if (keys.has(change.key)) {
-			duplicateKey = nextDuplicateKey(change.key, keys);
-		}
-	}
+	const duplicates = change.type === 'duplicate'
+		? planDuplicateKeys(change.keys, new Set(columns.flatMap(column => [...column.resource!.entries.keys()])))
+		: undefined;
 	const edit = new vscode.WorkspaceEdit();
 	let createdNeutral = false;
 	if (change.type === 'add' && !columns.some(column => !column.culture)) {
@@ -130,8 +121,8 @@ async function applyGridChange(columns: OpenColumn[], change: GridChange, neutra
 			changes = setResource(xml, resource!, change.key, change.value);
 		} else if (change.type === 'delete') {
 			changes = change.keys.flatMap(key => deleteResource(xml, resource!, key));
-		} else if (change.type === 'duplicate' && duplicateKey !== undefined) {
-			changes = duplicateResource(xml, resource!, change.key, duplicateKey);
+		} else if (duplicates) {
+			changes = duplicateResources(xml, resource!, duplicates);
 		} else if (change.type === 'sort') {
 			changes = sortResources(xml, resource!);
 		}
@@ -139,18 +130,8 @@ async function applyGridChange(columns: OpenColumn[], change: GridChange, neutra
 			edit.replace(document.uri, new vscode.Range(document.positionAt(start), document.positionAt(end)), text);
 		}
 	}
-	if (!edit.size && !createdNeutral) {
-		return change.type === 'sort' ? 'Files are already sorted.' : 'No changes to apply.';
-	}
-	if (!await vscode.workspace.applyEdit(edit)) {
+	if ((edit.size || createdNeutral) && !await vscode.workspace.applyEdit(edit)) {
 		throw new Error('VS Code could not apply the resource edits.');
-	}
-	switch (change.type) {
-		case 'add': return `Added ${change.key}.`;
-		case 'duplicate': return `Duplicated as ${duplicateKey}.`;
-		case 'delete': return change.keys.length === 1 ? `Deleted ${change.keys[0]}.` : `Deleted ${change.keys.length} keys.`;
-		case 'sort': return 'Sorted files by key.';
-		case 'set': return '';
 	}
 }
 
@@ -222,9 +203,9 @@ function attachGrid(panel: vscode.WebviewPanel, folder: vscode.Uri, family: stri
 					await publish(latest);
 					throw new Error('Resources changed. Try the edit again.');
 				}
-				const message = await applyGridChange(latest, change, vscode.Uri.joinPath(folder, family + '.resx'));
+				await applyGridChange(latest, change, vscode.Uri.joinPath(folder, family + '.resx'));
 				await publish(await openColumns(folder, family));
-				await post({ type: 'result', message });
+				await post({ type: 'result' });
 			});
 		}),
 	];

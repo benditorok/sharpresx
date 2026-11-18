@@ -7,7 +7,7 @@ For example, opening `AppResources/Labels.hu.resx` shows keys from `Labels.resx`
 - Search resource keys and stored values across all locales. The grid marks missing, empty, whitespace-only, and type or .NET format-placeholder mismatches.
 - Click a value to edit it inline. Press Enter to apply, Shift+Enter for a newline, or Escape to cancel.
 - Use **Add key** and enter a name to add an empty entry to the default RESX. Select rows by clicking their keys, using Ctrl/Cmd to toggle individual rows or Shift to select a range.
-- **Delete selected keys** removes those keys across the family. **Duplicate selected key** copies one row across its locales under the next available numeric suffix.
+- **Delete selected keys** removes those keys across the family. **Duplicate selected keys** copies each selected row across its locales under the next available numeric suffix.
 - **Sort files by key** reorders resource entries in each file. **Save files** saves the edited RESX documents through VS Code.
 
 ## Create RESX files

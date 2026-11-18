@@ -5,7 +5,7 @@ import * as path from 'node:path';
 import * as vscode from 'vscode';
 import { designerProjectEdit } from '../designer';
 import { gridData, renderGrid } from '../grid';
-import { deleteResource, duplicateResource, findResourceFamily, nextDuplicateKey, readResx, setResource, sortResources } from '../resx';
+import { deleteResource, duplicateResources, findResourceFamily, planDuplicateKeys, readResx, setResource, sortResources } from '../resx';
 import { scaffoldResx } from '../scaffold';
 import type { XmlEdit } from '../xml';
 
@@ -87,18 +87,22 @@ suite('RESX resource grid', () => {
 		assert.deepEqual(readResx(filled).entries.get('Empty')?.value, { kind: 'text', text: '' });
 	});
 
-	test('duplicates the full entry under the next free key', () => {
+	test('duplicates multiple full entries in one insertion with unique suffixes', () => {
 		const source = `<root>
   <data type='System.Int32' name='Count'><value>42</value><comment>Preserve</comment></data>
   <data name="Count1"><value>Already used</value></data>
 </root>`;
 		const resource = readResx(source);
-		const key = nextDuplicateKey('Count', new Set([...resource.entries.keys(), 'Count2']));
-		assert.equal(key, 'Count3');
-		const copy = apply(source, duplicateResource(source, resource, 'Count', key));
-		assert.deepEqual(readResx(copy).entries.get(key)?.value, { kind: 'non-string' });
-		assert.match(copy, /<data type='System.Int32' name="Count3"><value>42<\/value><comment>Preserve<\/comment>/);
-		assert.deepEqual(duplicateResource(source, resource, 'Missing', 'Missing1'), []);
+		const existing = new Set([...resource.entries.keys(), ...Array.from({ length: 9 }, (_, i) => 'Count' + (i + 2))]);
+		const duplicates = planDuplicateKeys(['Count1', 'Missing', 'Count'], existing);
+		assert.deepEqual([...duplicates], [['Count', 'Count11'], ['Count1', 'Count12']]);
+		const edits = duplicateResources(source, resource, duplicates);
+		assert.equal(edits.length, 1);
+		const copy = apply(source, edits);
+		assert.deepEqual(readResx(copy).entries.get('Count11')?.value, { kind: 'non-string' });
+		assert.deepEqual(readResx(copy).entries.get('Count12')?.value, { kind: 'text', text: 'Already used' });
+		assert.match(copy, /<data type='System.Int32' name="Count11"><value>42<\/value><comment>Preserve<\/comment>/);
+		assert.deepEqual(duplicateResources('<root />', readResx('<root />'), duplicates), []);
 	});
 
 	test('scaffolds schema-backed RESX files with optional string values', () => {

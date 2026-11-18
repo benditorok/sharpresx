@@ -22,7 +22,7 @@ let anchor;
 let editor;
 let refreshAfterEdit = false;
 let pending;
-let feedback = '';
+let errorMessage = '';
 
 function node(tag, text = '', className = '') {
 	const element = document.createElement(tag);
@@ -38,14 +38,14 @@ function button(text, className, action) {
 	return element;
 }
 
-function setFeedback(text, error = false) {
-	feedback = text;
-	message.classList.toggle('error', error);
+function setError(text) {
+	errorMessage = text;
+	message.classList.toggle('error', Boolean(text));
 	updateMessage();
 }
 
 function updateMessage() {
-	message.textContent = feedback || (state && !visibleRows.size && !editor
+	message.textContent = errorMessage || (state && !visibleRows.size && !editor
 		? (search.value.trim() ? 'No matches.' : 'No resource entries.') : '');
 }
 
@@ -57,7 +57,7 @@ function updateToolbar() {
 	const blocked = !state?.editable || Boolean(pending);
 	add.disabled = blocked;
 	remove.disabled = blocked || !selected.size;
-	duplicate.disabled = blocked || selected.size !== 1;
+	duplicate.disabled = blocked || !selected.size;
 	sort.disabled = blocked || !state.rows.length;
 	save.disabled = Boolean(pending) || !state?.canSave;
 }
@@ -266,7 +266,7 @@ function openNewKey() {
 	input.setAttribute('aria-describedby', 'grid-message');
 	input.addEventListener('input', () => {
 		input.removeAttribute('aria-invalid');
-		setFeedback('');
+		setError('');
 	});
 	input.autocomplete = 'off';
 	input.spellcheck = false;
@@ -277,7 +277,7 @@ function openNewKey() {
 	row.append(blank);
 	rows.prepend(row);
 	table.hidden = false;
-	setFeedback('');
+	setError('');
 	startEditor(input, () => {
 		const key = input.value.trim();
 		if (!key) {
@@ -285,7 +285,7 @@ function openNewKey() {
 		}
 		if (state.rows.some(row => row.key === key)) {
 			input.setAttribute('aria-invalid', 'true');
-			setFeedback('"' + key + '" already exists.', true);
+			setError('"' + key + '" already exists.');
 			return false;
 		}
 		return { type: 'add', key };
@@ -299,12 +299,12 @@ function openNewKey() {
 
 add.addEventListener('click', openNewKey);
 remove.addEventListener('click', () => send({ type: 'delete', keys: [...selected] }));
-duplicate.addEventListener('click', () => send({ type: 'duplicate', key: [...selected][0] }));
+duplicate.addEventListener('click', () => send({ type: 'duplicate', keys: [...selected] }));
 sort.addEventListener('click', () => send({ type: 'sort' }));
 save.addEventListener('click', () => send({ type: 'save' }));
 search.value = saved?.query ?? '';
 search.addEventListener('input', () => {
-	setFeedback('');
+	setError('');
 	renderRows();
 });
 
@@ -321,7 +321,7 @@ window.addEventListener('message', ({ data }) => {
 	} else if (data.type === 'result') {
 		const completed = pending;
 		pending = undefined;
-		setFeedback(data.error ?? data.message ?? '', Boolean(data.error));
+		setError(data.error ?? '');
 		updateToolbar();
 		if (completed?.type === 'add' && !data.error) {
 			selected.clear();

@@ -138,24 +138,38 @@ export function deleteResource(xml: string, resource: ResourceDocument, key: str
 	return [{ start, end, text: '' }];
 }
 
-export function nextDuplicateKey(key: string, keys: ReadonlySet<string>): string {
-	let suffix = 1;
-	while (keys.has(key + suffix)) {
-		suffix++;
+export function planDuplicateKeys(selected: string[], existing: ReadonlySet<string>): Map<string, string> {
+	const used = new Set(existing);
+	const duplicates = new Map<string, string>();
+	for (const key of [...new Set(selected)].sort()) {
+		if (!existing.has(key)) {
+			continue;
+		}
+		let suffix = 1;
+		while (used.has(key + suffix)) {
+			suffix++;
+		}
+		const duplicateKey = key + suffix;
+		duplicates.set(key, duplicateKey);
+		used.add(duplicateKey);
 	}
-	return key + suffix;
+	return duplicates;
 }
 
-export function duplicateResource(xml: string, resource: ResourceDocument, key: string, duplicateKey: string): XmlEdit[] {
-	const entry = resource.entries.get(key);
-	if (!entry) {
-		return [];
+export function duplicateResources(xml: string, resource: ResourceDocument, duplicates: ReadonlyMap<string, string>): XmlEdit[] {
+	const copies: string[] = [];
+	for (const [key, duplicateKey] of duplicates) {
+		const entry = resource.entries.get(key);
+		if (!entry) {
+			continue;
+		}
+		const { start, openEnd, end } = entry.element;
+		const open = xml.slice(start, openEnd).replace(/(\s+)([^\s=]+)(\s*=\s*)(["'])(.*?)\4/gs,
+			(attribute, prefix: string, name: string, equals: string) =>
+				name === 'name' ? `${prefix}${name}${equals}"${escapeXml(duplicateKey, true)}"` : attribute);
+		copies.push(open + xml.slice(openEnd, end));
 	}
-	const { start, openEnd, end } = entry.element;
-	const open = xml.slice(start, openEnd).replace(/(\s+)([^\s=]+)(\s*=\s*)(["'])(.*?)\4/gs,
-		(attribute, prefix: string, name: string, equals: string) =>
-			name === 'name' ? `${prefix}${name}${equals}"${escapeXml(duplicateKey, true)}"` : attribute);
-	return [appendXmlChild(xml, resource.root, [open + xml.slice(openEnd, end)])];
+	return copies.length ? [appendXmlChild(xml, resource.root, copies)] : [];
 }
 
 export function sortResources(xml: string, resource: ResourceDocument): XmlEdit[] {

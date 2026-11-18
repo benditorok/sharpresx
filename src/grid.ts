@@ -88,7 +88,7 @@ export function renderGrid(name: string, stylesheet: string, script: string, csp
 			<div class="actions" role="group" aria-label="Resource actions">
 				${iconButton('add-key', 'Add key', 'M12 5v14M5 12h14')}
 				${iconButton('delete-keys', 'Delete selected keys', 'M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 10v7m4-7v7')}
-				${iconButton('duplicate-key', 'Duplicate selected key', 'M8 8h12v12H8zM16 8V4H4v12h4')}
+				${iconButton('duplicate-key', 'Duplicate selected keys', 'M8 8h12v12H8zM16 8V4H4v12h4')}
 				${iconButton('sort-keys', 'Sort files by key', 'M5 6h14M5 11h10M5 16h6m6-2v7m-3-3 3 3 3-3')}
 				${iconButton('save-files', 'Save files', 'M5 4h12l3 3v13H4V4zm3 0v6h8V4M8 20v-6h8v6')}
 			</div>
