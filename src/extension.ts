@@ -275,15 +275,15 @@ export function activate(context: vscode.ExtensionContext) {
 	const panels = new Map<string, ReturnType<typeof attachGrid>>();
 	const media = vscode.Uri.joinPath(context.extensionUri, 'media');
 	context.subscriptions.push(
-		vscode.commands.registerCommand('netresx.createResourceFiles', createResourceFiles),
-		vscode.commands.registerCommand('netresx.configureDesigner', configureDesigner),
-		vscode.commands.registerCommand('netresx.saveGrid', () => {
+		vscode.commands.registerCommand('sharpresx.createResourceFiles', createResourceFiles),
+		vscode.commands.registerCommand('sharpresx.configureDesigner', configureDesigner),
+		vscode.commands.registerCommand('sharpresx.saveGrid', () => {
 			const active = [...panels.values()].find(({ panel }) => panel.active);
 			return active?.panel.webview.postMessage({ type: 'saveRequested' });
 		}),
 	);
 
-	context.subscriptions.push(vscode.commands.registerCommand('netresx.openTranslationGrid', async (uri?: vscode.Uri) => {
+	context.subscriptions.push(vscode.commands.registerCommand('sharpresx.openTranslationGrid', async (uri?: vscode.Uri) => {
 		const resource = uri ?? vscode.window.activeTextEditor?.document.uri;
 		const viewColumn = vscode.window.tabGroups.activeTabGroup.viewColumn;
 		if (!resource?.path.endsWith('.resx') || vscode.workspace.fs.isWritableFileSystem(resource.scheme) === undefined) {
@@ -302,7 +302,7 @@ export function activate(context: vscode.ExtensionContext) {
 				existing.panel.reveal(viewColumn);
 				existing.refresh();
 			} else {
-				const panel = vscode.window.createWebviewPanel('netresx.translationGrid', family.name,
+				const panel = vscode.window.createWebviewPanel('sharpresx.translationGrid', family.name,
 					viewColumn, { enableScripts: true, localResourceRoots: [media] });
 				panels.set(key, attachGrid(panel, folder, family.name, media));
 				panel.onDidDispose(() => panels.delete(key));

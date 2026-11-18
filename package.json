@@ -1,6 +1,6 @@
 {
-  "name": "netresx",
-  "displayName": "netresx",
+  "name": "sharpresx",
+  "displayName": "SharpResX",
   "description": "dotnet .resx editor",
   "version": "0.0.1",
   "engines": {
@@ -14,61 +14,61 @@
   "contributes": {
     "commands": [
       {
-        "command": "netresx.openTranslationGrid",
+        "command": "sharpresx.openTranslationGrid",
         "title": "Open Translation Grid",
-        "category": "RESX",
+        "category": "SharpResX",
         "icon": "$(table)"
       },
       {
-        "command": "netresx.createResourceFiles",
+        "command": "sharpresx.createResourceFiles",
         "title": "Create RESX Files",
-        "category": "RESX"
+        "category": "SharpResX"
       },
       {
-        "command": "netresx.configureDesigner",
+        "command": "sharpresx.configureDesigner",
         "title": "Configure Designer Generation",
-        "category": "RESX"
+        "category": "SharpResX"
       },
       {
-        "command": "netresx.saveGrid",
+        "command": "sharpresx.saveGrid",
         "title": "Save Resource Grid",
-        "category": "RESX"
+        "category": "SharpResX"
       }
     ],
     "menus": {
       "editor/title": [
         {
-          "command": "netresx.openTranslationGrid",
+          "command": "sharpresx.openTranslationGrid",
           "when": "resourceExtname == .resx && isFileSystemResource",
           "group": "navigation"
         }
       ],
       "commandPalette": [
         {
-          "command": "netresx.openTranslationGrid",
+          "command": "sharpresx.openTranslationGrid",
           "when": "resourceExtname == .resx && isFileSystemResource"
         },
         {
-          "command": "netresx.createResourceFiles",
+          "command": "sharpresx.createResourceFiles",
           "when": "resourceExtname == .resx && isFileSystemResource"
         },
         {
-          "command": "netresx.configureDesigner",
+          "command": "sharpresx.configureDesigner",
           "when": "resourceExtname == .resx && isFileSystemResource"
         },
         {
-          "command": "netresx.saveGrid",
-          "when": "activeWebviewPanelId == netresx.translationGrid"
+          "command": "sharpresx.saveGrid",
+          "when": "activeWebviewPanelId == sharpresx.translationGrid"
         }
       ],
       "explorer/context": [
         {
-          "command": "netresx.createResourceFiles",
+          "command": "sharpresx.createResourceFiles",
           "when": "isFileSystemResource && (explorerResourceIsFolder || resourceExtname == .resx)",
           "group": "2_workspace"
         },
         {
-          "command": "netresx.configureDesigner",
+          "command": "sharpresx.configureDesigner",
           "when": "resourceExtname == .resx && isFileSystemResource",
           "group": "2_workspace"
         }
@@ -76,10 +76,10 @@
     },
     "keybindings": [
       {
-        "command": "netresx.saveGrid",
+        "command": "sharpresx.saveGrid",
         "key": "ctrl+s",
         "mac": "cmd+s",
-        "when": "activeWebviewPanelId == netresx.translationGrid"
+        "when": "activeWebviewPanelId == sharpresx.translationGrid"
       }
     ]
   },

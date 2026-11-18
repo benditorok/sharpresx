@@ -153,10 +153,10 @@ suite('RESX resource grid', () => {
 	});
 
 	test('opens a separate tab in the current group and reuses it from sibling files', async () => {
-		const temp = await fs.mkdtemp(path.join(os.tmpdir(), 'netresx-test-'));
+		const temp = await fs.mkdtemp(path.join(os.tmpdir(), 'sharpresx-test-'));
 		const neutral = vscode.Uri.file(path.join(temp, 'Labels.resx'));
 		const localized = vscode.Uri.file(path.join(temp, 'Labels.hu.resx'));
-		const openGrid = 'netresx.openTranslationGrid';
+		const openGrid = 'sharpresx.openTranslationGrid';
 		const grids = () => vscode.window.tabGroups.all.flatMap(group => group.tabs)
 			.filter(tab => tab.input instanceof vscode.TabInputWebview && tab.label === 'Labels');
 		try {

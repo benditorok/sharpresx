@@ -1,6 +1,6 @@
-# netresx
+# SharpResX
 
-View and edit .NET RESX resource families in a VS Code editor tab. Open a saved resource file and click **Open Translation Grid** in the editor toolbar, or run **RESX: Open Translation Grid** from the Command Palette. The grid opens in the current editor group.
+View and edit .NET RESX resource families in a VS Code editor tab. Open a saved resource file and click **Open Translation Grid** in the editor toolbar, or run **SharpResX: Open Translation Grid** from the Command Palette. The grid opens in the current editor group.
 
 For example, opening `AppResources/Labels.hu.resx` shows keys from `Labels.resx`, `Labels.en.resx`, `Labels.hu.resx`, and other locale siblings in the same directory. The grid refreshes when resource files change.
 
@@ -8,7 +8,7 @@ For example, opening `AppResources/Labels.hu.resx` shows keys from `Labels.resx`
 - Click a value to edit it inline. Double-click a key or press F2 on it to rename it across the family. Press Enter to apply, Shift+Enter for a newline in a value, or Escape to cancel.
 - Use **Add key** and enter a name to add an empty entry to the default RESX. Select rows by clicking their keys, using Ctrl/Cmd to toggle individual rows or Shift to select a range.
 - **Delete selected keys** removes those keys across the family. **Duplicate selected keys** copies each selected row across its locales under the next available numeric suffix.
-- **Sort files by key** reorders resource entries in each file. **Save files** saves the edited RESX documents through VS Code. Press Ctrl+S (Cmd+S on macOS) in the grid to save. You can rebind **RESX: Save Resource Grid** in VS Code’s Keyboard Shortcuts.
+- **Sort files by key** reorders resource entries in each file. **Save files** saves the edited RESX documents through VS Code. Press Ctrl+S (Cmd+S on macOS) in the grid to save. You can rebind **SharpResX: Save Resource Grid** in VS Code’s Keyboard Shortcuts.
 - **Revert unsaved changes** appears before Save while backing RESX files are dirty. Confirm it to reload the resource family from disk. Closing the grid tab leaves applied edits in the backing documents, which follow VS Code’s Hot Exit setting when the window closes.
 
 ## Create RESX files
@@ -17,7 +17,7 @@ Right-click a folder or RESX file in Explorer and select **Create RESX Files**. 
 
 ## Configure the C# designer
 
-Right-click a RESX file and select **Configure Designer Generation**. Review the configuration for the neutral resource and apply it to the enclosing SDK-style `.csproj`. A normal `dotnet build` generates `ResourceFile.Designer.cs` beside the neutral RESX so it can be tracked in Git. Run the command again to migrate an earlier netresx configuration that generated into the intermediate output directory. The command supports standard embedded-resource naming and flags conflicting designer metadata before changing the project.
+Right-click a RESX file and select **Configure Designer Generation**. Review the configuration for the neutral resource and apply it to the enclosing SDK-style `.csproj`. A normal `dotnet build` generates `ResourceFile.Designer.cs` beside the neutral RESX so it can be tracked in Git. Run the command again to migrate an earlier configuration that generated into the intermediate output directory. The command supports standard embedded-resource naming and flags conflicting designer metadata before changing the project.
 
 ## Development
 
