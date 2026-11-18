@@ -92,12 +92,13 @@ export function renderGrid(name: string, stylesheet: string, script: string, csp
 				${iconButton('sort-keys', 'Sort files by key', 'M5 6h14M5 11h10M5 16h6m6-2v7m-3-3 3 3 3-3')}
 				${iconButton('save-files', 'Save files', 'M5 4h12l3 3v13H4V4zm3 0v6h8V4M8 20v-6h8v6')}
 			</div>
+			<p id="grid-message" role="status"></p>
 			<search>
 				<input id="grid-search" type="search" aria-label="Search keys and values"
 					placeholder="Search keys and values" autocomplete="off" spellcheck="false">
 			</search>
 		</div>
-		<p id="grid-message" role="status"></p>
+		<p id="grid-empty" role="status"></p>
 		<ul id="errors" hidden></ul>
 		<div class="table-wrapper" tabindex="0" role="region" aria-label="Resource entries" hidden>
 			<table aria-label="RESX resources">

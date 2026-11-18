@@ -6,6 +6,7 @@ const search = byId('grid-search');
 const headers = byId('grid-headers');
 const rows = byId('grid-rows');
 const message = byId('grid-message');
+const empty = byId('grid-empty');
 const errors = byId('errors');
 const table = document.querySelector('.table-wrapper');
 const add = byId('add-key');
@@ -22,7 +23,7 @@ let anchor;
 let editor;
 let refreshAfterEdit = false;
 let pending;
-let errorMessage = '';
+let saveAfterEdit = false;
 
 function node(tag, text = '', className = '') {
 	const element = document.createElement(tag);
@@ -39,14 +40,12 @@ function button(text, className, action) {
 }
 
 function setError(text) {
-	errorMessage = text;
-	message.classList.toggle('error', Boolean(text));
-	updateMessage();
+	message.textContent = text;
 }
 
 function updateMessage() {
-	message.textContent = errorMessage || (state && !visibleRows.size && !editor
-		? (search.value.trim() ? 'No matches.' : 'No resource entries.') : '');
+	empty.textContent = state && !visibleRows.size && !editor
+		? (search.value.trim() ? 'No matches.' : 'No resource entries.') : '';
 }
 
 function persistState() {
@@ -59,7 +58,7 @@ function updateToolbar() {
 	remove.disabled = blocked || !selected.size;
 	duplicate.disabled = blocked || !selected.size;
 	sort.disabled = blocked || !state.rows.length;
-	save.disabled = Boolean(pending) || !state?.canSave;
+	save.disabled = Boolean(pending) || (!editor && !state?.canSave);
 }
 
 function updateSelection() {
@@ -157,7 +156,23 @@ function renderRows() {
 		row.dataset.key = key;
 		const header = node('th');
 		header.scope = 'row';
-		header.append(button(key, 'key-select', event => select(key, event)));
+		const trigger = button(key, 'key-select', event => select(key, event));
+		if (state.editable) {
+			trigger.title = 'Double-click or press F2 to rename';
+			trigger.setAttribute('aria-keyshortcuts', 'F2');
+			trigger.addEventListener('dblclick', event => {
+				if (!event.ctrlKey && !event.metaKey && !event.shiftKey) {
+					openKeyEditor(trigger, key);
+				}
+			});
+			trigger.addEventListener('keydown', event => {
+				if (event.key === 'F2') {
+					event.preventDefault();
+					openKeyEditor(trigger, key);
+				}
+			});
+		}
+		header.append(trigger);
 		row.append(header, ...cells.map((cell, index) => renderCell(key, cell, state.files[index])));
 		visibleRows.set(key, row);
 		fragment.append(row);
@@ -201,14 +216,16 @@ function send(action, revision = state.revision) {
 
 function startEditor(input, readAction, restore) {
 	const revision = state.revision;
-	editor = input;
+	const current = { finish };
+	editor = current;
+	updateToolbar();
 	function finish(commit, keyboard) {
-		if (editor !== input) {
-			return;
+		if (editor !== current) {
+			return true;
 		}
 		const action = commit ? readAction() : undefined;
 		if (action === false && keyboard) {
-			return;
+			return false;
 		}
 		editor = undefined;
 		restore(keyboard);
@@ -220,7 +237,9 @@ function startEditor(input, readAction, restore) {
 			renderState();
 		}
 		table.hidden = !visibleRows.size;
+		updateToolbar();
 		updateMessage();
+		return true;
 	}
 	input.addEventListener('keydown', event => {
 		if (event.isComposing) {
@@ -252,17 +271,10 @@ function openCellEditor(trigger, key, cell, file) {
 	});
 }
 
-function openNewKey() {
-	if (editor || pending) {
-		return;
-	}
-	const row = node('tr');
-	const cell = node('th');
-	cell.scope = 'row';
+function keyInput(label) {
 	const input = node('input', '', 'inline-input');
 	input.type = 'text';
-	input.placeholder = 'New key';
-	input.setAttribute('aria-label', 'New resource key');
+	input.setAttribute('aria-label', label);
 	input.setAttribute('aria-describedby', 'grid-message');
 	input.addEventListener('input', () => {
 		input.removeAttribute('aria-invalid');
@@ -270,6 +282,61 @@ function openNewKey() {
 	});
 	input.autocomplete = 'off';
 	input.spellcheck = false;
+	setError('');
+	return input;
+}
+
+function validKey(input, key) {
+	const error = !key ? 'Enter a resource key.'
+		: state.rows.some(row => row.key === key) ? '"' + key + '" already exists.' : '';
+	if (error) {
+		input.setAttribute('aria-invalid', 'true');
+		setError(error);
+		return false;
+	}
+	return true;
+}
+
+function openKeyEditor(trigger, key) {
+	if (editor || pending) {
+		return;
+	}
+	if (!selected.has(key)) {
+		selected.clear();
+		selected.add(key);
+		updateSelection();
+	}
+	const input = keyInput('Rename ' + key);
+	input.value = key;
+	const original = input.value;
+	trigger.replaceWith(input);
+	startEditor(input, () => {
+		if (input.value === original) {
+			return undefined;
+		}
+		const newKey = input.value.trim();
+		if (newKey === key) {
+			return undefined;
+		}
+		return validKey(input, newKey) && { type: 'rename', key, newKey };
+	}, keyboard => {
+		input.replaceWith(trigger);
+		if (keyboard) {
+			trigger.focus();
+		}
+	});
+	input.select();
+}
+
+function openNewKey() {
+	if (editor || pending) {
+		return;
+	}
+	const row = node('tr');
+	const cell = node('th');
+	cell.scope = 'row';
+	const input = keyInput('New resource key');
+	input.placeholder = 'New key';
 	cell.append(input);
 	row.append(cell);
 	const blank = node('td');
@@ -277,18 +344,9 @@ function openNewKey() {
 	row.append(blank);
 	rows.prepend(row);
 	table.hidden = false;
-	setError('');
 	startEditor(input, () => {
 		const key = input.value.trim();
-		if (!key) {
-			return undefined;
-		}
-		if (state.rows.some(row => row.key === key)) {
-			input.setAttribute('aria-invalid', 'true');
-			setError('"' + key + '" already exists.');
-			return false;
-		}
-		return { type: 'add', key };
+		return key ? validKey(input, key) && { type: 'add', key } : undefined;
 	}, keyboard => {
 		row.remove();
 		if (keyboard) {
@@ -297,11 +355,27 @@ function openNewKey() {
 	});
 }
 
+function requestSave() {
+	if (!state || pending?.type === 'save' || (editor && !editor.finish(true, true))) {
+		return;
+	}
+	if (pending) {
+		saveAfterEdit = true;
+	} else if (state.canSave) {
+		send({ type: 'save' });
+	}
+}
+
 add.addEventListener('click', openNewKey);
 remove.addEventListener('click', () => send({ type: 'delete', keys: [...selected] }));
 duplicate.addEventListener('click', () => send({ type: 'duplicate', keys: [...selected] }));
 sort.addEventListener('click', () => send({ type: 'sort' }));
-save.addEventListener('click', () => send({ type: 'save' }));
+save.addEventListener('mousedown', event => {
+	if (editor) {
+		event.preventDefault();
+	}
+});
+save.addEventListener('click', requestSave);
 search.value = saved?.query ?? '';
 search.addEventListener('input', () => {
 	setError('');
@@ -309,7 +383,9 @@ search.addEventListener('input', () => {
 });
 
 window.addEventListener('message', ({ data }) => {
-	if (data.type === 'state') {
+	if (data.type === 'saveRequested') {
+		requestSave();
+	} else if (data.type === 'state') {
 		const redraw = !state || state.revision !== data.revision || state.editable !== data.editable;
 		state = data;
 		if (redraw && !editor) {
@@ -323,17 +399,26 @@ window.addEventListener('message', ({ data }) => {
 		pending = undefined;
 		setError(data.error ?? '');
 		updateToolbar();
-		if (completed?.type === 'add' && !data.error) {
-			selected.clear();
-			selected.add(completed.key);
-			anchor = completed.key;
-			if (!visibleRows.has(completed.key)) {
+		if (!data.error && (completed?.type === 'add' || completed?.type === 'rename')) {
+			const key = completed.type === 'rename' ? completed.newKey : completed.key;
+			if (completed.type === 'add') {
+				selected.clear();
+			}
+			selected.add(key);
+			anchor = key;
+			if (!visibleRows.has(key)) {
 				search.value = '';
 				renderRows();
 			} else {
 				updateSelection();
 			}
-			visibleRows.get(completed.key)?.querySelector('.key-select')?.focus();
+			visibleRows.get(key)?.querySelector('.key-select')?.focus();
+		}
+		if (saveAfterEdit) {
+			saveAfterEdit = false;
+			if (!data.error) {
+				requestSave();
+			}
 		}
 	}
 });

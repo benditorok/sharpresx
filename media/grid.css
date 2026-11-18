@@ -195,17 +195,27 @@ tr.selected :is(.cell-status, .cell-warning) {
 	font-size: 0.92em;
 }
 
-#grid-message {
+#grid-message,
+#grid-empty {
 	margin: 0;
+}
+
+#grid-message {
+	min-inline-size: 0;
+	max-inline-size: min(28rem, 100%);
+	overflow-wrap: anywhere;
+}
+
+#grid-empty {
 	color: var(--vscode-descriptionForeground);
 }
 
-#grid-message:not(:empty) {
+#grid-empty:not(:empty) {
 	padding: 0.25rem 0.6rem;
 }
 
 #errors,
-#grid-message.error {
+#grid-message {
 	color: var(--vscode-errorForeground);
 }
 

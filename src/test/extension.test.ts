@@ -5,7 +5,7 @@ import * as path from 'node:path';
 import * as vscode from 'vscode';
 import { designerProjectEdit } from '../designer';
 import { gridData, renderGrid } from '../grid';
-import { deleteResource, duplicateResources, findResourceFamily, planDuplicateKeys, readResx, setResource, sortResources } from '../resx';
+import { deleteResource, duplicateResources, findResourceFamily, planDuplicateKeys, readResx, renameResource, setResource, sortResources } from '../resx';
 import { scaffoldResx } from '../scaffold';
 import type { XmlEdit } from '../xml';
 
@@ -101,8 +101,12 @@ suite('RESX resource grid', () => {
 		const copy = apply(source, edits);
 		assert.deepEqual(readResx(copy).entries.get('Count11')?.value, { kind: 'non-string' });
 		assert.deepEqual(readResx(copy).entries.get('Count12')?.value, { kind: 'text', text: 'Already used' });
-		assert.match(copy, /<data type='System.Int32' name="Count11"><value>42<\/value><comment>Preserve<\/comment>/);
+		assert.match(copy, /<data type='System.Int32' name='Count11'><value>42<\/value><comment>Preserve<\/comment>/);
 		assert.deepEqual(duplicateResources('<root />', readResx('<root />'), duplicates), []);
+		const renamed = apply(source, renameResource(source, resource, 'Count', `New '"&`));
+		assert.equal(renamed, source.replace("name='Count'", "name='New &apos;&quot;&amp;'"));
+		assert.equal(readResx(renamed).entries.get(`New '"&`)?.value.kind, 'non-string');
+		assert.deepEqual(renameResource(source, resource, 'Missing', 'New'), []);
 	});
 
 	test('scaffolds schema-backed RESX files with optional string values', () => {

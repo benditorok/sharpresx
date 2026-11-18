@@ -3,7 +3,7 @@ import * as vscode from 'vscode';
 import { configureDesigner } from './designer';
 import { gridData, renderGrid, type GridColumn } from './grid';
 import {
-	deleteResource, duplicateResources, findResourceFamily, listResourceFiles, planDuplicateKeys, readResx, setResource, sortResources,
+	deleteResource, duplicateResources, findResourceFamily, listResourceFiles, planDuplicateKeys, readResx, renameResource, setResource, sortResources,
 } from './resx';
 import { createResourceFiles, scaffoldResx } from './scaffold';
 import type { XmlEdit } from './xml';
@@ -17,6 +17,7 @@ interface OpenColumn extends GridColumn {
 type GridChange =
 	| { type: 'set'; key: string; file: string; value: string }
 	| { type: 'add'; key: string }
+	| { type: 'rename'; key: string; newKey: string }
 	| { type: 'delete' | 'duplicate'; keys: string[] }
 	| { type: 'sort' | 'save' };
 
@@ -48,7 +49,7 @@ function object(value: unknown): value is Record<string, unknown> {
 }
 
 function readChange(message: Record<string, unknown>): GridChange {
-	const { type, key, keys, file, value } = message;
+	const { type, key, keys, file, value, newKey } = message;
 	if (type === 'sort' || type === 'save') {
 		return { type };
 	}
@@ -58,6 +59,9 @@ function readChange(message: Record<string, unknown>): GridChange {
 	if (typeof key === 'string') {
 		if (type === 'add' && key.trim()) {
 			return { type, key };
+		}
+		if (type === 'rename' && typeof newKey === 'string' && newKey.trim()) {
+			return { type, key, newKey };
 		}
 		if (type === 'set' && typeof file === 'string' && typeof value === 'string') {
 			return { type, key, file, value };
@@ -90,8 +94,10 @@ async function applyGridChange(columns: OpenColumn[], change: GridChange, neutra
 	if (!columns.length || columns.some(column => !column.resource)) {
 		throw new Error('Fix the invalid RESX files before making changes in the grid.');
 	}
-	if (change.type === 'add' && columns.some(column => column.resource!.entries.has(change.key))) {
-		throw new Error(`"${change.key}" already exists.`);
+	const newKey = change.type === 'add' ? change.key
+		: change.type === 'rename' && change.key !== change.newKey ? change.newKey : undefined;
+	if (newKey !== undefined && columns.some(column => column.resource!.entries.has(newKey))) {
+		throw new Error(`"${newKey}" already exists.`);
 	}
 	if (change.type === 'set' && !columns.some(column => column.fileName === change.file)) {
 		throw new Error('The target file is no longer part of this resource family.');
@@ -119,6 +125,8 @@ async function applyGridChange(columns: OpenColumn[], change: GridChange, neutra
 			changes = setResource(xml, resource!, change.key, '');
 		} else if (change.type === 'set' && change.file === fileName) {
 			changes = setResource(xml, resource!, change.key, change.value);
+		} else if (change.type === 'rename') {
+			changes = renameResource(xml, resource!, change.key, change.newKey);
 		} else if (change.type === 'delete') {
 			changes = change.keys.flatMap(key => deleteResource(xml, resource!, key));
 		} else if (duplicates) {
@@ -227,6 +235,10 @@ export function activate(context: vscode.ExtensionContext) {
 	context.subscriptions.push(
 		vscode.commands.registerCommand('netresx.createResourceFiles', createResourceFiles),
 		vscode.commands.registerCommand('netresx.configureDesigner', configureDesigner),
+		vscode.commands.registerCommand('netresx.saveGrid', () => {
+			const active = [...panels.values()].find(({ panel }) => panel.active);
+			return active?.panel.webview.postMessage({ type: 'saveRequested' });
+		}),
 	);
 
 	context.subscriptions.push(vscode.commands.registerCommand('netresx.openTranslationGrid', async (uri?: vscode.Uri) => {

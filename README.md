@@ -5,10 +5,10 @@ View and edit .NET RESX resource families in a VS Code editor tab. Open a saved 
 For example, opening `AppResources/Labels.hu.resx` shows keys from `Labels.resx`, `Labels.en.resx`, `Labels.hu.resx`, and other locale siblings in the same directory. The grid refreshes when resource files change.
 
 - Search resource keys and stored values across all locales. The grid marks missing, empty, whitespace-only, and type or .NET format-placeholder mismatches.
-- Click a value to edit it inline. Press Enter to apply, Shift+Enter for a newline, or Escape to cancel.
+- Click a value to edit it inline. Double-click a key or press F2 on it to rename it across the family. Press Enter to apply, Shift+Enter for a newline in a value, or Escape to cancel.
 - Use **Add key** and enter a name to add an empty entry to the default RESX. Select rows by clicking their keys, using Ctrl/Cmd to toggle individual rows or Shift to select a range.
 - **Delete selected keys** removes those keys across the family. **Duplicate selected keys** copies each selected row across its locales under the next available numeric suffix.
-- **Sort files by key** reorders resource entries in each file. **Save files** saves the edited RESX documents through VS Code.
+- **Sort files by key** reorders resource entries in each file. **Save files** saves the edited RESX documents through VS Code. Press Ctrl+S (Cmd+S on macOS) in the grid to save. You can rebind **RESX: Save Resource Grid** in VS Code’s Keyboard Shortcuts.
 
 ## Create RESX files
 

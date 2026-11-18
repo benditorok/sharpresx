@@ -28,6 +28,11 @@
         "command": "netresx.configureDesigner",
         "title": "Configure Designer Generation",
         "category": "RESX"
+      },
+      {
+        "command": "netresx.saveGrid",
+        "title": "Save Resource Grid",
+        "category": "RESX"
       }
     ],
     "menus": {
@@ -50,6 +55,10 @@
         {
           "command": "netresx.configureDesigner",
           "when": "resourceExtname == .resx && isFileSystemResource"
+        },
+        {
+          "command": "netresx.saveGrid",
+          "when": "activeWebviewPanelId == netresx.translationGrid"
         }
       ],
       "explorer/context": [
@@ -64,7 +73,15 @@
           "group": "2_workspace"
         }
       ]
-    }
+    },
+    "keybindings": [
+      {
+        "command": "netresx.saveGrid",
+        "key": "ctrl+s",
+        "mac": "cmd+s",
+        "when": "activeWebviewPanelId == netresx.translationGrid"
+      }
+    ]
   },
   "scripts": {
     "vscode:prepublish": "pnpm run package",

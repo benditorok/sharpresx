@@ -156,6 +156,24 @@ export function planDuplicateKeys(selected: string[], existing: ReadonlySet<stri
 	return duplicates;
 }
 
+function resourceNameEdit(xml: string, element: XmlElement, key: string): XmlEdit {
+	const open = xml.slice(element.start, element.openEnd);
+	const match = [...open.matchAll(/(\s+)([^\s=]+)(\s*=\s*)(["'])(.*?)\4/gs)].find(match => match[2] === 'name');
+	if (!match) {
+		throw new Error('The resource has no editable name attribute.');
+	}
+	const [, whitespace, name, equals, quote, current] = match;
+	const start = element.start + match.index + whitespace.length + name.length + equals.length + 1;
+	const escaped = escapeXml(key, true);
+	const text = quote === "'" ? escaped.replaceAll("'", '&apos;') : escaped;
+	return { start, end: start + current.length, text };
+}
+
+export function renameResource(xml: string, resource: ResourceDocument, key: string, newKey: string): XmlEdit[] {
+	const entry = resource.entries.get(key);
+	return entry && key !== newKey ? [resourceNameEdit(xml, entry.element, newKey)] : [];
+}
+
 export function duplicateResources(xml: string, resource: ResourceDocument, duplicates: ReadonlyMap<string, string>): XmlEdit[] {
 	const copies: string[] = [];
 	for (const [key, duplicateKey] of duplicates) {
@@ -163,11 +181,9 @@ export function duplicateResources(xml: string, resource: ResourceDocument, dupl
 		if (!entry) {
 			continue;
 		}
-		const { start, openEnd, end } = entry.element;
-		const open = xml.slice(start, openEnd).replace(/(\s+)([^\s=]+)(\s*=\s*)(["'])(.*?)\4/gs,
-			(attribute, prefix: string, name: string, equals: string) =>
-				name === 'name' ? `${prefix}${name}${equals}"${escapeXml(duplicateKey, true)}"` : attribute);
-		copies.push(open + xml.slice(openEnd, end));
+		const element = entry.element;
+		const edit = resourceNameEdit(xml, element, duplicateKey);
+		copies.push(xml.slice(element.start, edit.start) + edit.text + xml.slice(edit.end, element.end));
 	}
 	return copies.length ? [appendXmlChild(xml, resource.root, copies)] : [];
 }
