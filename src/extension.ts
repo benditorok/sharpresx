@@ -2,8 +2,10 @@ import * as path from 'node:path';
 import * as vscode from 'vscode';
 import { configureDesigner } from './designer';
 import { gridData, renderGrid, type GridColumn } from './grid';
-import { deleteResource, findResourceFamily, listResourceFiles, readResx, setResource, sortResources } from './resx';
-import { createResourceFiles } from './scaffold';
+import {
+	deleteResource, duplicateResource, findResourceFamily, listResourceFiles, nextDuplicateKey, readResx, setResource, sortResources,
+} from './resx';
+import { createResourceFiles, scaffoldResx } from './scaffold';
 import type { XmlEdit } from './xml';
 
 interface OpenColumn extends GridColumn {
@@ -14,8 +16,8 @@ interface OpenColumn extends GridColumn {
 
 type GridChange =
 	| { type: 'set'; key: string; file: string; value: string }
-	| { type: 'add'; key: string; values: { file: string; value: string }[] }
-	| { type: 'delete'; key: string }
+	| { type: 'add' | 'duplicate'; key: string }
+	| { type: 'delete'; keys: string[] }
 	| { type: 'sort' | 'save' };
 
 function errorText(error: unknown): string {
@@ -46,25 +48,22 @@ function object(value: unknown): value is Record<string, unknown> {
 }
 
 function readChange(message: Record<string, unknown>): GridChange {
-	const { type, key, file, value, values } = message;
+	const { type, key, keys, file, value } = message;
 	if (type === 'sort' || type === 'save') {
 		return { type };
 	}
-	if (typeof key !== 'string' || !key.trim()) {
-		throw new Error('Enter a resource key.');
+	if (type === 'delete' && Array.isArray(keys) && keys.length && keys.every(key => typeof key === 'string')) {
+		return { type, keys: [...new Set(keys)] };
 	}
-	if (type === 'delete') {
-		return { type, key };
+	if (typeof key === 'string') {
+		if (type === 'duplicate' || (type === 'add' && key.trim())) {
+			return { type, key };
+		}
+		if (type === 'set' && typeof file === 'string' && typeof value === 'string') {
+			return { type, key, file, value };
+		}
 	}
-	if (type === 'set' && typeof file === 'string' && typeof value === 'string') {
-		return { type, key, file, value };
-	}
-	if (type === 'add' && Array.isArray(values) && values.length &&
-		values.every(entry => object(entry) && typeof entry.file === 'string' &&
-			typeof entry.value === 'string' && entry.value !== '')) {
-		return { type, key, values };
-	}
-	throw new Error('Enter at least one resource value.');
+	throw new Error('Invalid resource edit.');
 }
 
 function sameResources(first: OpenColumn[], second: OpenColumn[]): boolean {
@@ -74,7 +73,7 @@ function sameResources(first: OpenColumn[], second: OpenColumn[]): boolean {
 	});
 }
 
-async function applyGridChange(columns: OpenColumn[], change: GridChange): Promise<string> {
+async function applyGridChange(columns: OpenColumn[], change: GridChange, neutralUri: vscode.Uri): Promise<string> {
 	if (change.type === 'save') {
 		const unsaved: string[] = [];
 		let saved = 0;
@@ -97,32 +96,42 @@ async function applyGridChange(columns: OpenColumn[], change: GridChange): Promi
 		throw new Error('Fix the invalid RESX files before making changes in the grid.');
 	}
 	if (change.type === 'add' && columns.some(column => column.resource!.entries.has(change.key))) {
-		throw new Error(`"${change.key}" already exists in this resource family.`);
+		throw new Error(`"${change.key}" already exists.`);
+	}
+	if (change.type === 'set' && !columns.some(column => column.fileName === change.file)) {
+		throw new Error('The target file is no longer part of this resource family.');
 	}
 
-	const values = new Map<string, string>();
-	if (change.type === 'add') {
-		for (const { file, value } of change.values) {
-			values.set(file, value);
+	let duplicateKey: string | undefined;
+	if (change.type === 'duplicate') {
+		const keys = new Set(columns.flatMap(column => [...column.resource!.entries.keys()]));
+		if (keys.has(change.key)) {
+			duplicateKey = nextDuplicateKey(change.key, keys);
 		}
-	} else if (change.type === 'set') {
-		values.set(change.file, change.value);
 	}
-	if ([...values.keys()].some(file => !columns.some(column => column.fileName === file))) {
-		throw new Error('A target file is no longer part of this resource family.');
+	const edit = new vscode.WorkspaceEdit();
+	let createdNeutral = false;
+	if (change.type === 'add' && !columns.some(column => !column.culture)) {
+		const xml = scaffoldResx();
+		const [entry] = setResource(xml, readResx(xml), change.key, '');
+		const contents = Buffer.from(xml.slice(0, entry.start) + entry.text + xml.slice(entry.end), 'utf8');
+		edit.createFile(neutralUri, { contents, overwrite: false });
+		createdNeutral = true;
 	}
 
-	const edit = new vscode.WorkspaceEdit();
-	for (const { document, xml, resource, fileName, version } of columns) {
+	for (const { document, xml, resource, fileName, version, culture } of columns) {
 		if (document.isClosed || document.version !== version) {
-			throw new Error('Resources changed. Reopen the action to use the latest values.');
+			throw new Error('Resources changed. Try the edit again.');
 		}
 		let changes: XmlEdit[] = [];
-		const value = values.get(fileName);
-		if (value !== undefined && (change.type === 'add' || change.type === 'set')) {
-			changes = setResource(xml, resource!, change.key, value);
+		if (change.type === 'add' && !culture) {
+			changes = setResource(xml, resource!, change.key, '');
+		} else if (change.type === 'set' && change.file === fileName) {
+			changes = setResource(xml, resource!, change.key, change.value);
 		} else if (change.type === 'delete') {
-			changes = deleteResource(xml, resource!, change.key);
+			changes = change.keys.flatMap(key => deleteResource(xml, resource!, key));
+		} else if (change.type === 'duplicate' && duplicateKey !== undefined) {
+			changes = duplicateResource(xml, resource!, change.key, duplicateKey);
 		} else if (change.type === 'sort') {
 			changes = sortResources(xml, resource!);
 		}
@@ -130,13 +139,19 @@ async function applyGridChange(columns: OpenColumn[], change: GridChange): Promi
 			edit.replace(document.uri, new vscode.Range(document.positionAt(start), document.positionAt(end)), text);
 		}
 	}
-	if (!edit.size) {
-		return change.type === 'sort' ? 'The files are already sorted.' : 'No changes to apply.';
+	if (!edit.size && !createdNeutral) {
+		return change.type === 'sort' ? 'Files are already sorted.' : 'No changes to apply.';
 	}
 	if (!await vscode.workspace.applyEdit(edit)) {
 		throw new Error('VS Code could not apply the resource edits.');
 	}
-	return 'Changes applied. Use Save files to write them to disk.';
+	switch (change.type) {
+		case 'add': return `Added ${change.key}.`;
+		case 'duplicate': return `Duplicated as ${duplicateKey}.`;
+		case 'delete': return change.keys.length === 1 ? `Deleted ${change.keys[0]}.` : `Deleted ${change.keys.length} keys.`;
+		case 'sort': return 'Sorted files by key.';
+		case 'set': return '';
+	}
 }
 
 function attachGrid(panel: vscode.WebviewPanel, folder: vscode.Uri, family: string, media: vscode.Uri) {
@@ -205,9 +220,9 @@ function attachGrid(panel: vscode.WebviewPanel, folder: vscode.Uri, family: stri
 				const latest = await openColumns(folder, family);
 				if (change.type !== 'save' && (input.revision !== revision || !sameResources(columns, latest))) {
 					await publish(latest);
-					throw new Error('Resources changed. Reopen the action to use the latest values.');
+					throw new Error('Resources changed. Try the edit again.');
 				}
-				const message = await applyGridChange(latest, change);
+				const message = await applyGridChange(latest, change, vscode.Uri.joinPath(folder, family + '.resx'));
 				await publish(await openColumns(folder, family));
 				await post({ type: 'result', message });
 			});
@@ -235,6 +250,7 @@ export function activate(context: vscode.ExtensionContext) {
 
 	context.subscriptions.push(vscode.commands.registerCommand('netresx.openTranslationGrid', async (uri?: vscode.Uri) => {
 		const resource = uri ?? vscode.window.activeTextEditor?.document.uri;
+		const viewColumn = vscode.window.tabGroups.activeTabGroup.viewColumn;
 		if (!resource?.path.endsWith('.resx') || vscode.workspace.fs.isWritableFileSystem(resource.scheme) === undefined) {
 			void vscode.window.showInformationMessage('Open a .resx file to view its resource grid.');
 			return;
@@ -248,11 +264,11 @@ export function activate(context: vscode.ExtensionContext) {
 			const key = vscode.Uri.joinPath(folder, family.name + '.resx').toString();
 			const existing = panels.get(key);
 			if (existing) {
-				existing.panel.reveal();
+				existing.panel.reveal(viewColumn);
 				existing.refresh();
 			} else {
 				const panel = vscode.window.createWebviewPanel('netresx.translationGrid', family.name,
-					vscode.ViewColumn.Beside, { enableScripts: true, localResourceRoots: [media] });
+					viewColumn, { enableScripts: true, localResourceRoots: [media] });
 				panels.set(key, attachGrid(panel, folder, family.name, media));
 				panel.onDidDispose(() => panels.delete(key));
 			}

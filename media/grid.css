@@ -1,14 +1,102 @@
 body {
 	margin: 0;
-	padding: 1rem;
+	padding: 0;
+}
+
+main {
+	display: flex;
+	flex-direction: column;
+	block-size: 100vh;
+}
+
+.toolbar {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 0.35rem 0.75rem;
+	padding: 0.35rem 0.6rem;
+	border-block-end: 1px solid var(--vscode-editorGroup-border);
+}
+
+.actions {
+	display: flex;
+	gap: 2px;
+}
+
+search {
+	flex: 0 1 16rem;
+	min-inline-size: min(9rem, 100%);
+	margin-inline-start: auto;
+}
+
+button,
+input,
+textarea {
+	box-sizing: border-box;
+	font: inherit;
+}
+
+button {
+	color: inherit;
+	background: transparent;
+	border: 0;
+	cursor: pointer;
+}
+
+button:disabled {
+	opacity: 0.45;
+	cursor: default;
+}
+
+.tool-button {
+	display: grid;
+	place-items: center;
+	min-inline-size: 28px;
+	min-block-size: 28px;
+	padding: 3px;
+	border-radius: 4px;
+}
+
+.tool-button:not(:disabled):hover {
+	background: var(--vscode-toolbar-hoverBackground);
+}
+
+.tool-button svg {
+	inline-size: 16px;
+	block-size: 16px;
+	fill: none;
+	stroke: currentColor;
+	stroke-width: 1.6;
+	stroke-linecap: round;
+	stroke-linejoin: round;
+}
+
+input,
+textarea {
+	color: var(--vscode-input-foreground);
+	background: var(--vscode-input-background);
+	border: 1px solid var(--vscode-input-border, var(--vscode-editorGroup-border));
+	border-radius: 3px;
+	min-inline-size: 0;
+}
+
+#grid-search {
+	inline-size: 100%;
+	min-block-size: 26px;
+	padding: 2px 0.45rem;
+}
+
+input::placeholder {
+	color: var(--vscode-input-placeholderForeground);
 }
 
 .table-wrapper {
+	flex: 1;
+	min-block-size: 0;
 	overflow: auto;
-	max-block-size: calc(100vh - 2rem);
 }
 
-.table-wrapper:focus-visible {
+:where(button, input, textarea, .table-wrapper):focus-visible {
 	outline: 1px solid var(--vscode-focusBorder);
 	outline-offset: -1px;
 }
@@ -17,25 +105,15 @@ table {
 	min-inline-size: 100%;
 	border-collapse: separate;
 	border-spacing: 0;
-	text-align: start;
-}
-
-caption {
-	text-align: start;
-}
-
-h1 {
-	margin: 0 0 0.75rem;
-	font-size: 1.35em;
 }
 
 th,
 td {
-	min-inline-size: 11rem;
-	max-inline-size: 28rem;
-	padding: 0.5rem 0.75rem;
+	min-inline-size: 8rem;
+	max-inline-size: 25rem;
+	padding: 1px 0.5rem;
 	border-block-end: 1px solid var(--vscode-editorGroup-border);
-	vertical-align: top;
+	vertical-align: middle;
 	text-align: start;
 	overflow-wrap: anywhere;
 }
@@ -43,104 +121,59 @@ td {
 thead {
 	position: sticky;
 	inset-block-start: 0;
-	z-index: 1;
+	z-index: 2;
 	background: var(--vscode-editor-background);
+}
+
+thead th {
+	block-size: 24px;
 }
 
 thead th:first-child,
 tbody th {
 	position: sticky;
 	inset-inline-start: 0;
+	z-index: 1;
 	background: var(--vscode-editor-background);
 	border-inline-end: 1px solid var(--vscode-editorGroup-border);
 }
 
-.translation {
-	white-space: pre-wrap;
+tbody tr:hover > * {
+	background-color: var(--vscode-list-hoverBackground);
 }
 
-.status {
-	color: var(--vscode-descriptionForeground);
-	font-style: italic;
+tbody tr.selected > * {
+	color: var(--vscode-list-activeSelectionForeground);
+	background-color: var(--vscode-list-activeSelectionBackground);
 }
 
-main {
-	display: flex;
-	flex-direction: column;
-	max-block-size: calc(100vh - 2rem);
+.key-select,
+.cell-edit {
+	display: block;
+	inline-size: 100%;
+	min-block-size: 24px;
+	padding: 1px 0;
+	text-align: start;
+	overflow-wrap: anywhere;
 }
 
-.toolbar,
-.actions {
-	display: flex;
-	align-items: end;
-	flex-wrap: wrap;
-	gap: 0.5rem;
+.key-select {
+	font-weight: inherit;
 }
 
-.toolbar {
-	justify-content: space-between;
+.inline-input {
+	display: block;
+	inline-size: 100%;
+	min-block-size: 24px;
+	padding: 1px 0.25rem;
 }
 
-search,
-.field {
-	display: grid;
-	gap: 0.25rem;
-}
-
-search {
-	flex: 1 1 12rem;
-	max-inline-size: 30rem;
-}
-
-button,
-input,
-textarea {
-	font: inherit;
-	box-sizing: border-box;
-	border: 1px solid var(--vscode-input-border, var(--vscode-editorGroup-border));
-	border-radius: 3px;
-	padding: 0.3rem 0.55rem;
-}
-
-input,
-textarea {
-	color: var(--vscode-input-foreground);
-	background: var(--vscode-input-background);
-	min-inline-size: 0;
-}
-
-textarea {
+textarea.inline-input {
 	resize: vertical;
 }
 
-button {
-	color: var(--vscode-button-secondaryForeground);
-	background: var(--vscode-button-secondaryBackground);
-	cursor: pointer;
-}
-
-button:hover:not(:disabled) {
-	background: var(--vscode-button-secondaryHoverBackground);
-}
-
-button:disabled {
-	opacity: 0.55;
-	cursor: default;
-}
-
-:where(button, input, textarea):focus-visible {
-	outline: 1px solid var(--vscode-focusBorder);
-	outline-offset: 1px;
-}
-
-.cell-edit {
-	inline-size: 100%;
-	padding: 0;
-	text-align: start;
-	border-color: transparent;
-	color: inherit;
-	background: transparent;
+.translation {
+	white-space: pre-wrap;
 }
 
 .warning-cell {
@@ -153,53 +186,39 @@ button:disabled {
 	font-style: italic;
 }
 
+tr.selected :is(.cell-status, .cell-warning) {
+	color: inherit;
+}
+
 .cell-warning {
 	display: block;
-	margin-block-start: 0.25rem;
+	font-size: 0.92em;
+}
+
+#grid-message {
+	margin: 0;
+	color: var(--vscode-descriptionForeground);
+}
+
+#grid-message:not(:empty) {
+	padding: 0.25rem 0.6rem;
 }
 
 #errors,
-#dialog-error {
+#grid-message.error {
 	color: var(--vscode-errorForeground);
 }
 
-dialog:modal {
-	overscroll-behavior: contain;
-	inline-size: min(32rem, calc(100% - 3rem));
-	max-block-size: calc(100% - 3rem);
-	overflow: auto;
-	color: var(--vscode-editor-foreground);
-	background: var(--vscode-editorWidget-background);
-	border: 1px solid var(--vscode-editorWidget-border, var(--vscode-focusBorder));
-}
+@media (forced-colors: active) {
+	.warning-cell {
+		border-inline-start: 3px solid Mark;
+	}
 
-dialog::backdrop {
-	overflow: hidden;
-	overscroll-behavior: contain;
-	background: rgb(0 0 0 / 50%);
-}
-
-dialog h2 {
-	margin-block-start: 0;
-}
-
-#dialog-fields {
-	display: grid;
-	gap: 0.65rem;
-}
-
-dialog .actions {
-	justify-content: end;
-	margin-block-start: 0.75rem;
-}
-
-#submit-edit {
-	color: var(--vscode-button-foreground);
-	background: var(--vscode-button-background);
-}
-
-#submit-edit:hover:not(:disabled) {
-	background: var(--vscode-button-hoverBackground);
+	tbody tr.selected > * {
+		forced-color-adjust: none;
+		color: HighlightText;
+		background: Highlight;
+	}
 }
 
 [hidden] {

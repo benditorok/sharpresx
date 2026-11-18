@@ -63,6 +63,12 @@ function escapeHtml(text: string): string {
 	return text.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;');
 }
 
+function iconButton(id: string, label: string, path: string): string {
+	return `<button id="${id}" class="tool-button" type="button" aria-label="${label}" title="${label}" disabled>
+		<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="${path}"></path></svg>
+	</button>`;
+}
+
 export function renderGrid(name: string, stylesheet: string, script: string, cspSource: string): string {
 	const title = escapeHtml(name);
 	const source = escapeHtml(cspSource);
@@ -78,39 +84,28 @@ export function renderGrid(name: string, stylesheet: string, script: string, csp
 </head>
 <body>
 	<main>
-		<h1 id="family-name">${title}</h1>
 		<div class="toolbar">
-			<search>
-				<label for="grid-search">Search keys and values</label>
-				<input id="grid-search" type="search" autocomplete="off" spellcheck="false">
-			</search>
-			<div class="actions">
-				<button id="add-key" type="button" disabled>Add key</button>
-				<button id="sort-keys" type="button" disabled>Sort files by key</button>
-				<button id="save-files" type="button" disabled>Save files</button>
+			<div class="actions" role="group" aria-label="Resource actions">
+				${iconButton('add-key', 'Add key', 'M12 5v14M5 12h14')}
+				${iconButton('delete-keys', 'Delete selected keys', 'M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 10v7m4-7v7')}
+				${iconButton('duplicate-key', 'Duplicate selected key', 'M8 8h12v12H8zM16 8V4H4v12h4')}
+				${iconButton('sort-keys', 'Sort files by key', 'M5 6h14M5 11h10M5 16h6m6-2v7m-3-3 3 3 3-3')}
+				${iconButton('save-files', 'Save files', 'M5 4h12l3 3v13H4V4zm3 0v6h8V4M8 20v-6h8v6')}
 			</div>
+			<search>
+				<input id="grid-search" type="search" aria-label="Search keys and values"
+					placeholder="Search keys and values" autocomplete="off" spellcheck="false">
+			</search>
 		</div>
-		<p id="grid-message" role="status">Loading resources…</p>
+		<p id="grid-message" role="status"></p>
 		<ul id="errors" hidden></ul>
-		<div class="table-wrapper" tabindex="0" role="region" aria-labelledby="family-name" hidden>
-			<table aria-labelledby="family-name">
+		<div class="table-wrapper" tabindex="0" role="region" aria-label="Resource entries" hidden>
+			<table aria-label="RESX resources">
 				<thead><tr id="grid-headers"></tr></thead>
 				<tbody id="grid-rows"></tbody>
 			</table>
 		</div>
 	</main>
-	<dialog id="edit-dialog" aria-labelledby="dialog-title">
-		<form id="edit-form" method="dialog">
-			<h2 id="dialog-title"></h2>
-			<p id="dialog-hint" hidden></p>
-			<div id="dialog-fields"></div>
-			<p id="dialog-error" role="alert" hidden></p>
-			<div class="actions">
-				<button id="cancel-edit" type="button">Cancel</button>
-				<button id="submit-edit" type="submit"></button>
-			</div>
-		</form>
-	</dialog>
 </body>
 </html>`;
 }

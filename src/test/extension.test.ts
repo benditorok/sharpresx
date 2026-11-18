@@ -5,7 +5,7 @@ import * as path from 'node:path';
 import * as vscode from 'vscode';
 import { designerProjectEdit } from '../designer';
 import { gridData, renderGrid } from '../grid';
-import { deleteResource, findResourceFamily, readResx, setResource, sortResources } from '../resx';
+import { deleteResource, duplicateResource, findResourceFamily, nextDuplicateKey, readResx, setResource, sortResources } from '../resx';
 import { scaffoldResx } from '../scaffold';
 import type { XmlEdit } from '../xml';
 
@@ -87,6 +87,20 @@ suite('RESX resource grid', () => {
 		assert.deepEqual(readResx(filled).entries.get('Empty')?.value, { kind: 'text', text: '' });
 	});
 
+	test('duplicates the full entry under the next free key', () => {
+		const source = `<root>
+  <data type='System.Int32' name='Count'><value>42</value><comment>Preserve</comment></data>
+  <data name="Count1"><value>Already used</value></data>
+</root>`;
+		const resource = readResx(source);
+		const key = nextDuplicateKey('Count', new Set([...resource.entries.keys(), 'Count2']));
+		assert.equal(key, 'Count3');
+		const copy = apply(source, duplicateResource(source, resource, 'Count', key));
+		assert.deepEqual(readResx(copy).entries.get(key)?.value, { kind: 'non-string' });
+		assert.match(copy, /<data type='System.Int32' name="Count3"><value>42<\/value><comment>Preserve<\/comment>/);
+		assert.deepEqual(duplicateResource(source, resource, 'Missing', 'Missing1'), []);
+	});
+
 	test('scaffolds schema-backed RESX files with optional string values', () => {
 		const blank = scaffoldResx();
 		assert.match(blank, /<xsd:schema/);
@@ -123,7 +137,7 @@ suite('RESX resource grid', () => {
 		assert.throws(() => designerProjectEdit(legacy, relative), /different Generator/);
 	});
 
-	test('opens and reuses a side-by-side panel from the command', async () => {
+	test('opens a separate tab in the current group and reuses it from sibling files', async () => {
 		const temp = await fs.mkdtemp(path.join(os.tmpdir(), 'netresx-test-'));
 		const neutral = vscode.Uri.file(path.join(temp, 'Labels.resx'));
 		const localized = vscode.Uri.file(path.join(temp, 'Labels.hu.resx'));
@@ -135,7 +149,9 @@ suite('RESX resource grid', () => {
 			const source = await vscode.window.showTextDocument(neutral);
 			await vscode.commands.executeCommand(openGrid);
 			assert.equal(grids().length, 1);
-			assert.notEqual(grids()[0].group.viewColumn, source.viewColumn);
+			assert.equal(grids()[0].group.viewColumn, source.viewColumn);
+			assert.ok(grids()[0].group.tabs.some(tab => tab.input instanceof vscode.TabInputText &&
+				tab.input.uri.toString() === neutral.toString()));
 			await vscode.commands.executeCommand(openGrid, localized);
 			assert.equal(grids().length, 1);
 		} finally {

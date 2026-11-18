@@ -9,223 +9,331 @@ const message = byId('grid-message');
 const errors = byId('errors');
 const table = document.querySelector('.table-wrapper');
 const add = byId('add-key');
+const remove = byId('delete-keys');
+const duplicate = byId('duplicate-key');
 const sort = byId('sort-keys');
 const save = byId('save-files');
-const dialog = byId('edit-dialog');
-const form = byId('edit-form');
-const fields = byId('dialog-fields');
-const hint = byId('dialog-hint');
-const dialogError = byId('dialog-error');
-const cancel = byId('cancel-edit');
-const submit = byId('submit-edit');
+const saved = vscode.getState();
+const selected = new Set(saved?.selected ?? []);
+const visibleRows = new Map();
 
 let state;
-let pending = false;
-let activeDialog;
+let anchor;
+let editor;
+let refreshAfterEdit = false;
+let pending;
 let feedback = '';
 
-function node(tag, text = '', className) {
+function node(tag, text = '', className = '') {
 	const element = document.createElement(tag);
 	element.textContent = text;
-	if (className) {
-		element.className = className;
-	}
+	element.className = className;
 	return element;
 }
 
-function button(text, action) {
-	const element = node('button', text);
+function button(text, className, action) {
+	const element = node('button', text, className);
 	element.type = 'button';
 	element.addEventListener('click', action);
 	return element;
 }
 
-function renderRows() {
-	const query = search.value.toLowerCase().trim();
-	const matching = state?.rows.filter(row => !query || row.key.toLowerCase().includes(query) ||
-		row.cells.some(cell => (cell.text ?? cell.searchValue)?.toLowerCase().includes(query))) ?? [];
-	const fragment = document.createDocumentFragment();
-	for (const { key, cells } of matching) {
-		const row = node('tr');
-		const header = node('th', key);
-		header.scope = 'row';
-		row.append(header);
-		cells.forEach((cell, index) => {
-			const file = state.files[index];
-			const col = node('td');
-			const editable = state.editable && !['Non-string', 'Unavailable'].includes(cell.status);
-			const value = cell.status ?? cell.text ?? '';
-			const content = cell.status ? node('span', value, 'cell-status') : node('span', value, 'translation');
-			if (cell.text !== undefined && !cell.status) {
-				content.dir = 'auto';
-				if (file.culture) {
-					content.lang = file.culture;
-				}
-			}
-			if (editable) {
-				const edit = button('', () => openEdit(key, file, cell.text ?? ''));
-				edit.className = 'cell-edit';
-				edit.setAttribute('aria-label', 'Edit ' + key + ' in ' + file.fileName + ': ' + value);
-				edit.append(content);
-				col.append(edit);
-			} else {
-				col.append(content);
-			}
-			if (cell.warning || ['Missing', 'Empty', 'Whitespace only'].includes(cell.status)) {
-				col.classList.add('warning-cell');
-			}
-			if (cell.warning) {
-				col.append(node('span', cell.warning, 'cell-warning'));
-			}
-			row.append(col);
-		});
-		const actions = node('td');
-		if (state.editable) {
-			const remove = button('Delete', () => openDelete(key));
-			remove.setAttribute('aria-label', 'Delete ' + key);
-			actions.append(remove);
+function setFeedback(text, error = false) {
+	feedback = text;
+	message.classList.toggle('error', error);
+	updateMessage();
+}
+
+function updateMessage() {
+	message.textContent = feedback || (state && !visibleRows.size && !editor
+		? (search.value.trim() ? 'No matches.' : 'No resource entries.') : '');
+}
+
+function persistState() {
+	vscode.setState({ query: search.value, selected: [...selected] });
+}
+
+function updateToolbar() {
+	const blocked = !state?.editable || Boolean(pending);
+	add.disabled = blocked;
+	remove.disabled = blocked || !selected.size;
+	duplicate.disabled = blocked || selected.size !== 1;
+	sort.disabled = blocked || !state.rows.length;
+	save.disabled = Boolean(pending) || !state?.canSave;
+}
+
+function updateSelection() {
+	for (const [key, row] of visibleRows) {
+		const pressed = selected.has(key);
+		row.classList.toggle('selected', pressed);
+		row.querySelector('.key-select').setAttribute('aria-pressed', String(pressed));
+	}
+	updateToolbar();
+	persistState();
+}
+
+function select(key, event) {
+	const toggle = event.ctrlKey || event.metaKey;
+	if (event.shiftKey && visibleRows.has(anchor)) {
+		const keys = [...visibleRows.keys()];
+		const start = keys.indexOf(anchor);
+		const end = keys.indexOf(key);
+		if (!toggle) {
+			selected.clear();
 		}
-		row.append(actions);
+		for (const key of keys.slice(Math.min(start, end), Math.max(start, end) + 1)) {
+			selected.add(key);
+		}
+	} else if (toggle) {
+		if (!selected.delete(key)) {
+			selected.add(key);
+		}
+		anchor = key;
+	} else {
+		const deselect = selected.size === 1 && selected.has(key);
+		selected.clear();
+		if (!deselect) {
+			selected.add(key);
+		}
+		anchor = key;
+	}
+	updateSelection();
+}
+
+function renderCell(key, cell, file) {
+	const column = node('td');
+	const value = cell.status ?? cell.text ?? '';
+	const content = node('span', value, cell.status ? 'cell-status' : 'translation');
+	const locale = file.culture ?? 'Default';
+	if (!cell.status) {
+		content.dir = 'auto';
+		if (file.culture) {
+			content.lang = file.culture;
+		}
+	}
+	if (state.editable && !['Non-string', 'Unavailable'].includes(cell.status)) {
+		const edit = button('', 'cell-edit', event => {
+			if (event.ctrlKey || event.metaKey || event.shiftKey) {
+				select(key, event);
+			} else if (!pending && !editor) {
+				if (!selected.has(key)) {
+					select(key, event);
+				}
+				openCellEditor(edit, key, cell, file);
+			}
+		});
+		edit.setAttribute('aria-label', 'Edit ' + key + ' in ' + locale + ': ' + value);
+		edit.append(content);
+		column.append(edit);
+	} else {
+		column.append(content);
+	}
+	if (cell.warning || ['Missing', 'Empty', 'Whitespace only'].includes(cell.status)) {
+		column.classList.add('warning-cell');
+	}
+	if (cell.warning) {
+		column.append(node('span', cell.warning, 'cell-warning'));
+	}
+	return column;
+}
+
+function renderRows() {
+	if (editor) {
+		refreshAfterEdit = true;
+		return;
+	}
+	const focus = document.activeElement;
+	const focusKey = focus?.closest('[data-key]')?.dataset.key;
+	const focusColumn = focus?.closest('th, td')?.cellIndex;
+	const query = search.value.trim().toLowerCase();
+	visibleRows.clear();
+	const fragment = document.createDocumentFragment();
+	for (const { key, cells } of state?.rows ?? []) {
+		if (query && !key.toLowerCase().includes(query) &&
+			!cells.some(cell => (cell.text ?? cell.searchValue)?.toLowerCase().includes(query))) {
+			continue;
+		}
+		const row = node('tr');
+		row.dataset.key = key;
+		const header = node('th');
+		header.scope = 'row';
+		header.append(button(key, 'key-select', event => select(key, event)));
+		row.append(header, ...cells.map((cell, index) => renderCell(key, cell, state.files[index])));
+		visibleRows.set(key, row);
 		fragment.append(row);
 	}
 	rows.replaceChildren(fragment);
-	table.hidden = !matching.length;
-	const summary = matching.length ? matching.length + ' of ' + state.rows.length + ' keys'
-		: query ? 'No matching keys or values.' : 'No resource entries found.';
-	message.textContent = feedback || (state ? summary : 'Loading resources…');
+	for (const key of selected) {
+		if (!visibleRows.has(key)) {
+			selected.delete(key);
+		}
+	}
+	table.hidden = !visibleRows.size;
+	updateSelection();
+	updateMessage();
+	if (focusKey !== undefined && focusColumn !== undefined) {
+		visibleRows.get(focusKey)?.cells[focusColumn]?.querySelector('button')?.focus({ preventScroll: true });
+	}
 }
 
 function renderState() {
-	const key = node('th', 'Key');
-	key.scope = 'col';
-	const actions = node('th', 'Actions');
-	actions.scope = 'col';
-	headers.replaceChildren(key, ...state.files.map(file => {
-		const column = node('th', file.culture ?? 'Default');
+	const columns = ['Key', ...state.files.map(file => file.culture ?? 'Default')];
+	headers.replaceChildren(...columns.map(label => {
+		const column = node('th', label);
 		column.scope = 'col';
-		column.title = file.fileName;
 		return column;
-	}), actions);
-	const issues = state.files.filter(file => file.error).map(file => node('li', file.fileName + ': ' + file.error));
+	}));
+	const issues = state.files.filter(file => file.error)
+		.map(file => node('li', (file.culture ?? 'Default') + ': ' + file.error));
 	errors.replaceChildren(...issues);
 	errors.hidden = !issues.length;
-	add.disabled = !state.editable;
-	sort.disabled = !state.editable || !state.rows.length;
-	save.disabled = !state.canSave;
 	renderRows();
-}
-
-function field(labelText, id, multiline, value = '') {
-	const group = node('div', '', 'field');
-	const label = node('label', labelText);
-	label.htmlFor = id;
-	const input = node(multiline ? 'textarea' : 'input');
-	input.id = id;
-	input.name = id;
-	input.value = value;
-	input.autocomplete = 'off';
-	if (multiline) {
-		input.rows = 2;
-	} else {
-		input.spellcheck = false;
-	}
-	group.append(label, input);
-	fields.append(group);
-	return input;
-}
-
-function showDialog(title, action, hintText, setup) {
-	if (pending) {
-		return;
-	}
-	byId('dialog-title').textContent = title;
-	submit.textContent = action;
-	hint.textContent = hintText;
-	hint.hidden = !hintText;
-	dialogError.hidden = true;
-	fields.replaceChildren();
-	activeDialog = { revision: state.revision, buildAction: setup() };
-	dialog.showModal();
-}
-
-function openAdd() {
-	showDialog('Add key', 'Add key', 'Enter a value for each file you want to update.', () => {
-		const key = field('Key (required)', 'new-key', false);
-		key.required = true;
-		key.autofocus = true;
-		const inputs = state.files.map((file, index) => ({
-			file: file.fileName, input: field(file.fileName, 'file-' + index, true),
-		}));
-		return () => ({
-			type: 'add', key: key.value.trim(),
-			values: inputs.filter(({ input }) => input.value !== '')
-				.map(({ file, input }) => ({ file, value: input.value })),
-		});
-	});
-}
-
-function openEdit(key, file, value) {
-	showDialog('Edit ' + key, 'Apply change', file.fileName, () => {
-		const input = field('Value', 'cell-value', true, value);
-		input.autofocus = true;
-		return () => ({ type: 'set', key, file: file.fileName, value: input.value });
-	});
-}
-
-function openDelete(key) {
-	showDialog('Delete ' + key + '?', 'Delete key', 'This removes the key from every file in this resource family.', () => {
-		cancel.autofocus = true;
-		return () => ({ type: 'delete', key });
-	});
-	cancel.autofocus = false;
 }
 
 function send(action, revision = state.revision) {
 	if (pending) {
 		return;
 	}
-	pending = true;
-	submit.disabled = true;
+	pending = action;
+	updateToolbar();
 	vscode.postMessage({ ...action, revision });
 }
 
-add.addEventListener('click', openAdd);
-sort.addEventListener('click', () => send({ type: 'sort' }));
-save.addEventListener('click', () => send({ type: 'save' }));
-cancel.addEventListener('click', () => dialog.close());
-form.addEventListener('submit', event => {
-	event.preventDefault();
-	const action = activeDialog.buildAction();
-	if (action.type === 'add' && (!action.key || !action.values.length)) {
-		dialogError.textContent = 'Enter a key and at least one value.';
-		dialogError.hidden = false;
+function startEditor(input, readAction, restore) {
+	const revision = state.revision;
+	editor = input;
+	function finish(commit, keyboard) {
+		if (editor !== input) {
+			return;
+		}
+		const action = commit ? readAction() : undefined;
+		if (action === false && keyboard) {
+			return;
+		}
+		editor = undefined;
+		restore(keyboard);
+		if (action) {
+			send(action, revision);
+		}
+		if (refreshAfterEdit) {
+			refreshAfterEdit = false;
+			renderState();
+		}
+		table.hidden = !visibleRows.size;
+		updateMessage();
+	}
+	input.addEventListener('keydown', event => {
+		if (event.isComposing) {
+			return;
+		}
+		if (event.key === 'Escape' || (event.key === 'Enter' && !(input instanceof HTMLTextAreaElement && event.shiftKey))) {
+			event.preventDefault();
+			finish(event.key === 'Enter', true);
+		}
+	});
+	input.addEventListener('blur', () => finish(true, false));
+	input.focus();
+}
+
+function openCellEditor(trigger, key, cell, file) {
+	const input = node('textarea', '', 'inline-input');
+	input.value = cell.text ?? '';
+	const original = input.value;
+	input.rows = 1;
+	input.dir = 'auto';
+	input.setAttribute('aria-label', 'Value for ' + key + ' in ' + (file.culture ?? 'Default'));
+	trigger.replaceWith(input);
+	startEditor(input, () => input.value === original ? undefined
+		: { type: 'set', key, file: file.fileName, value: input.value }, keyboard => {
+		input.replaceWith(trigger);
+		if (keyboard) {
+			trigger.focus();
+		}
+	});
+}
+
+function openNewKey() {
+	if (editor || pending) {
 		return;
 	}
-	send(action, activeDialog.revision);
-});
-search.value = vscode.getState()?.query ?? '';
+	const row = node('tr');
+	const cell = node('th');
+	cell.scope = 'row';
+	const input = node('input', '', 'inline-input');
+	input.type = 'text';
+	input.placeholder = 'New key';
+	input.setAttribute('aria-label', 'New resource key');
+	input.setAttribute('aria-describedby', 'grid-message');
+	input.addEventListener('input', () => {
+		input.removeAttribute('aria-invalid');
+		setFeedback('');
+	});
+	input.autocomplete = 'off';
+	input.spellcheck = false;
+	cell.append(input);
+	row.append(cell);
+	const blank = node('td');
+	blank.colSpan = state.files.length;
+	row.append(blank);
+	rows.prepend(row);
+	table.hidden = false;
+	setFeedback('');
+	startEditor(input, () => {
+		const key = input.value.trim();
+		if (!key) {
+			return undefined;
+		}
+		if (state.rows.some(row => row.key === key)) {
+			input.setAttribute('aria-invalid', 'true');
+			setFeedback('"' + key + '" already exists.', true);
+			return false;
+		}
+		return { type: 'add', key };
+	}, keyboard => {
+		row.remove();
+		if (keyboard) {
+			add.focus();
+		}
+	});
+}
+
+add.addEventListener('click', openNewKey);
+remove.addEventListener('click', () => send({ type: 'delete', keys: [...selected] }));
+duplicate.addEventListener('click', () => send({ type: 'duplicate', key: [...selected][0] }));
+sort.addEventListener('click', () => send({ type: 'sort' }));
+save.addEventListener('click', () => send({ type: 'save' }));
+search.value = saved?.query ?? '';
 search.addEventListener('input', () => {
-	feedback = '';
-	vscode.setState({ query: search.value });
+	setFeedback('');
 	renderRows();
 });
 
 window.addEventListener('message', ({ data }) => {
 	if (data.type === 'state') {
+		const redraw = !state || state.revision !== data.revision || state.editable !== data.editable;
 		state = data;
-		renderState();
-	} else if (data.type === 'result') {
-		pending = false;
-		submit.disabled = false;
-		if (data.error && dialog.open) {
-			dialogError.textContent = data.error;
-			dialogError.hidden = false;
+		if (redraw && !editor) {
+			renderState();
 		} else {
-			if (dialog.open) {
-				dialog.close();
+			refreshAfterEdit ||= redraw;
+			updateToolbar();
+		}
+	} else if (data.type === 'result') {
+		const completed = pending;
+		pending = undefined;
+		setFeedback(data.error ?? data.message ?? '', Boolean(data.error));
+		updateToolbar();
+		if (completed?.type === 'add' && !data.error) {
+			selected.clear();
+			selected.add(completed.key);
+			anchor = completed.key;
+			if (!visibleRows.has(completed.key)) {
+				search.value = '';
+				renderRows();
+			} else {
+				updateSelection();
 			}
-			feedback = data.error || data.message || '';
-			renderRows();
+			visibleRows.get(completed.key)?.querySelector('.key-select')?.focus();
 		}
 	}
 });

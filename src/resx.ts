@@ -138,6 +138,26 @@ export function deleteResource(xml: string, resource: ResourceDocument, key: str
 	return [{ start, end, text: '' }];
 }
 
+export function nextDuplicateKey(key: string, keys: ReadonlySet<string>): string {
+	let suffix = 1;
+	while (keys.has(key + suffix)) {
+		suffix++;
+	}
+	return key + suffix;
+}
+
+export function duplicateResource(xml: string, resource: ResourceDocument, key: string, duplicateKey: string): XmlEdit[] {
+	const entry = resource.entries.get(key);
+	if (!entry) {
+		return [];
+	}
+	const { start, openEnd, end } = entry.element;
+	const open = xml.slice(start, openEnd).replace(/(\s+)([^\s=]+)(\s*=\s*)(["'])(.*?)\4/gs,
+		(attribute, prefix: string, name: string, equals: string) =>
+			name === 'name' ? `${prefix}${name}${equals}"${escapeXml(duplicateKey, true)}"` : attribute);
+	return [appendXmlChild(xml, resource.root, [open + xml.slice(openEnd, end)])];
+}
+
 export function sortResources(xml: string, resource: ResourceDocument): XmlEdit[] {
 	const original = [...resource.entries];
 	const sorted = [...original].sort(([left], [right]) => left < right ? -1 : left > right ? 1 : 0);
