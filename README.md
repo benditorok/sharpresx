@@ -9,6 +9,7 @@ For example, opening `AppResources/Labels.hu.resx` shows keys from `Labels.resx`
 - Use **Add key** and enter a name to add an empty entry to the default RESX. Select rows by clicking their keys, using Ctrl/Cmd to toggle individual rows or Shift to select a range.
 - **Delete selected keys** removes those keys across the family. **Duplicate selected keys** copies each selected row across its locales under the next available numeric suffix.
 - **Sort files by key** reorders resource entries in each file. **Save files** saves the edited RESX documents through VS Code. Press Ctrl+S (Cmd+S on macOS) in the grid to save. You can rebind **RESX: Save Resource Grid** in VS Code’s Keyboard Shortcuts.
+- **Revert unsaved changes** appears before Save while backing RESX files are dirty. Confirm it to reload the resource family from disk. Closing the grid tab leaves applied edits in the backing documents, which follow VS Code’s Hot Exit setting when the window closes.
 
 ## Create RESX files
 

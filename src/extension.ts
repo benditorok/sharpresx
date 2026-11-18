@@ -19,7 +19,7 @@ type GridChange =
 	| { type: 'add'; key: string }
 	| { type: 'rename'; key: string; newKey: string }
 	| { type: 'delete' | 'duplicate'; keys: string[] }
-	| { type: 'sort' | 'save' };
+	| { type: 'sort' | 'save' | 'revert' };
 
 function errorText(error: unknown): string {
 	return error instanceof Error ? error.message : String(error);
@@ -50,7 +50,7 @@ function object(value: unknown): value is Record<string, unknown> {
 
 function readChange(message: Record<string, unknown>): GridChange {
 	const { type, key, keys, file, value, newKey } = message;
-	if (type === 'sort' || type === 'save') {
+	if (type === 'sort' || type === 'save' || type === 'revert') {
 		return { type };
 	}
 	if ((type === 'delete' || type === 'duplicate') && Array.isArray(keys) && keys.length && keys.every(key => typeof key === 'string')) {
@@ -143,6 +143,37 @@ async function applyGridChange(columns: OpenColumn[], change: GridChange, neutra
 	}
 }
 
+async function revertGridChanges(columns: OpenColumn[], viewColumn: vscode.ViewColumn | undefined): Promise<void> {
+	const existingTabs = new Set(vscode.window.tabGroups.all.flatMap(group => group.tabs));
+	const openedTabs: vscode.Tab[] = [];
+	try {
+		for (const { document, version, fileName } of columns) {
+			if (!document.isDirty) {
+				continue;
+			}
+			// The built-in Revert File command targets the active text editor.
+			const editor = await vscode.window.showTextDocument(document, { viewColumn, preview: false });
+			const tab = vscode.window.tabGroups.activeTabGroup.activeTab;
+			if (tab?.input instanceof vscode.TabInputText &&
+				tab.input.uri.toString() === document.uri.toString() && !existingTabs.has(tab)) {
+				openedTabs.push(tab);
+			}
+			if (vscode.window.activeTextEditor !== editor || document.version !== version) {
+				throw new Error('Resources changed. Review the remaining edits before reverting.');
+			}
+			await vscode.commands.executeCommand('workbench.action.files.revert');
+			if (document.isDirty) {
+				throw new Error(`Could not revert ${fileName}.`);
+			}
+		}
+	} finally {
+		const cleanTabs = openedTabs.filter(tab => !tab.isDirty && tab.group.tabs.includes(tab));
+		if (cleanTabs.length) {
+			await vscode.window.tabGroups.close(cleanTabs, true);
+		}
+	}
+}
+
 function attachGrid(panel: vscode.WebviewPanel, folder: vscode.Uri, family: string, media: vscode.Uri) {
 	let columns: OpenColumn[] = [];
 	let revision = 0;
@@ -211,8 +242,19 @@ function attachGrid(panel: vscode.WebviewPanel, folder: vscode.Uri, family: stri
 					await publish(latest);
 					throw new Error('Resources changed. Try the edit again.');
 				}
-				await applyGridChange(latest, change, vscode.Uri.joinPath(folder, family + '.resx'));
-				await publish(await openColumns(folder, family));
+				if (change.type === 'revert') {
+					try {
+						await revertGridChanges(latest, panel.viewColumn);
+					} finally {
+						if (!disposed) {
+							panel.reveal();
+						}
+						await publish(await openColumns(folder, family));
+					}
+				} else {
+					await applyGridChange(latest, change, vscode.Uri.joinPath(folder, family + '.resx'));
+					await publish(await openColumns(folder, family));
+				}
 				await post({ type: 'result' });
 			});
 		}),

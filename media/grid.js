@@ -14,6 +14,10 @@ const remove = byId('delete-keys');
 const duplicate = byId('duplicate-key');
 const sort = byId('sort-keys');
 const save = byId('save-files');
+const revert = byId('revert-files');
+const confirmation = byId('revert-confirmation');
+const cancelRevert = byId('revert-cancel');
+const confirmRevert = byId('revert-confirm');
 const saved = vscode.getState();
 const selected = new Set(saved?.selected ?? []);
 const visibleRows = new Map();
@@ -24,6 +28,7 @@ let editor;
 let refreshAfterEdit = false;
 let pending;
 let saveAfterEdit = false;
+let revertRevision;
 
 function node(tag, text = '', className = '') {
 	const element = document.createElement(tag);
@@ -59,6 +64,13 @@ function updateToolbar() {
 	duplicate.disabled = blocked || !selected.size;
 	sort.disabled = blocked || !state.rows.length;
 	save.disabled = Boolean(pending) || (!editor && !state?.canSave);
+	revert.hidden = !state?.canSave;
+	revert.disabled = Boolean(pending);
+	if (revert.hidden || pending) {
+		revertRevision = undefined;
+	}
+	confirmation.hidden = revertRevision === undefined;
+	revert.setAttribute('aria-expanded', String(!confirmation.hidden));
 }
 
 function updateSelection() {
@@ -377,6 +389,29 @@ save.addEventListener('mousedown', event => {
 	}
 });
 save.addEventListener('click', requestSave);
+revert.setAttribute('aria-controls', 'revert-confirmation');
+revert.addEventListener('click', () => {
+	revertRevision = state.revision;
+	updateToolbar();
+	cancelRevert.focus();
+});
+function dismissRevert() {
+	revertRevision = undefined;
+	updateToolbar();
+	revert.focus();
+}
+cancelRevert.addEventListener('click', dismissRevert);
+confirmation.addEventListener('keydown', event => {
+	if (event.key === 'Escape') {
+		event.preventDefault();
+		dismissRevert();
+	}
+});
+confirmRevert.addEventListener('click', () => {
+	if (revertRevision !== undefined) {
+		send({ type: 'revert' }, revertRevision);
+	}
+});
 search.value = saved?.query ?? '';
 search.addEventListener('input', () => {
 	setError('');

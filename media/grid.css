@@ -234,3 +234,23 @@ tr.selected :is(.cell-status, .cell-warning) {
 [hidden] {
 	display: none !important;
 }
+
+
+#revert-confirmation {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 0.25rem;
+}
+
+#revert-confirmation button {
+	min-block-size: 24px;
+	padding: 2px 0.4rem;
+	border-radius: 3px;
+	background: var(--vscode-button-secondaryBackground);
+	color: var(--vscode-button-secondaryForeground);
+}
+
+#revert-confirmation button:hover {
+	background: var(--vscode-button-secondaryHoverBackground);
+}

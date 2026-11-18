@@ -63,8 +63,8 @@ function escapeHtml(text: string): string {
 	return text.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;');
 }
 
-function iconButton(id: string, label: string, path: string): string {
-	return `<button id="${id}" class="tool-button" type="button" aria-label="${label}" title="${label}" disabled>
+function iconButton(id: string, label: string, path: string, hidden = false): string {
+	return `<button id="${id}" class="tool-button" type="button" aria-label="${label}" title="${label}" disabled${hidden ? ' hidden' : ''}>
 		<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="${path}"></path></svg>
 	</button>`;
 }
@@ -90,7 +90,13 @@ export function renderGrid(name: string, stylesheet: string, script: string, csp
 				${iconButton('delete-keys', 'Delete selected keys', 'M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 10v7m4-7v7')}
 				${iconButton('duplicate-key', 'Duplicate selected keys', 'M8 8h12v12H8zM16 8V4H4v12h4')}
 				${iconButton('sort-keys', 'Sort files by key', 'M5 6h14M5 11h10M5 16h6m6-2v7m-3-3 3 3 3-3')}
+				${iconButton('revert-files', 'Revert unsaved changes', 'M4 11h11a5 5 0 0 1 0 10h-3M4 11l6-6m-6 6 6 6', true)}
 				${iconButton('save-files', 'Save files', 'M5 4h12l3 3v13H4V4zm3 0v6h8V4M8 20v-6h8v6')}
+			</div>
+			<div id="revert-confirmation" role="group" aria-labelledby="revert-label" hidden>
+				<span id="revert-label">Discard unsaved changes in these RESX files?</span>
+				<button id="revert-cancel" type="button">Cancel</button>
+				<button id="revert-confirm" type="button">Revert</button>
 			</div>
 			<p id="grid-message" role="status"></p>
 			<search>
