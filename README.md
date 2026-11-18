@@ -1,16 +1,20 @@
 # netresx
 
-View .NET RESX translations side by side in VS Code. Open a saved resource file and click **Open Translation Grid** in the editor toolbar, or run **RESX: Open Translation Grid** from the Command Palette.
+View and edit .NET RESX resource families side by side in VS Code. Open a saved resource file and click **Open Translation Grid** in the editor toolbar, or run **RESX: Open Translation Grid** from the Command Palette.
 
-For example, opening `AppResources/Labels.hu.resx` shows keys from `Labels.resx`, `Labels.en.resx`, `Labels.hu.resx`, and other locale siblings in the same directory. The preview labels missing and explicitly empty entries separately. Run the command again to refresh the grid from the current documents.
+For example, opening `AppResources/Labels.hu.resx` shows keys from `Labels.resx`, `Labels.en.resx`, `Labels.hu.resx`, and other locale siblings in the same directory. The grid refreshes when resource files change.
+
+- Search resource keys and string values across all locales. The grid marks missing, empty, whitespace-only, and type or .NET format-placeholder mismatches.
+- Click a value to edit it. **Add key** writes entries to the files for which you provide a value. **Delete** removes the key across the family after confirmation.
+- **Sort files by key** reorders resource entries in each file. **Save files** saves the edited RESX documents through VS Code.
 
 ## Development
 
-Run `pnpm install`, then press **F5** to launch the Extension Development Host with the TypeScript and esbuild watchers. The webview uses HTML and CSS. Use `pnpm run compile` for a one-off type check, lint, and build.
+Run `pnpm install`, then press **F5** to launch the Extension Development Host with the TypeScript and esbuild watchers. The webview uses HTML, CSS, and JavaScript. Use `pnpm run compile` for a one-off type check, lint, and build.
 
 ## Roadmap
 
-1. **Grid preview.** Open one grid per resource family from the editor toolbar or Command Palette.
-2. **Translation editing.** Edit string cells and add missing entries using targeted VS Code document edits. Refresh after source changes and detect stale edits. Preserve comments, whitespace, encoding, and non-string entries.
-3. **Locale scaffolding.** Add an Explorer action to choose cultures and create sibling files from the RESX schema and headers. When scaffolding from an existing family, offer to seed keys from the neutral file. Leave untranslated keys absent by default so .NET fallback still works, and protect existing files from overwrite.
-4. **Strongly typed C# resources.** Add an explicit action for the neutral resource after verifying a build-time approach on a sample SDK-style C# project. Resolve the `.csproj` that owns the resource and preview an idempotent `EmbeddedResource` metadata change for MSBuild’s `GenerateResource`. Verify that a clean `dotnet build` exposes the static resource class and still resolves localized values.
+1. **Grid navigation and validation.** Use the family name as the title, search resource keys and values across locales, and flag missing entries, blank values, and mismatched .NET format placeholders.
+2. **Grid editing and organization.** Add keys where a locale value is supplied, edit string cells, delete keys across the family, and sort each file's entries by key. Use targeted VS Code edits, refresh from file changes, and reject edits made against stale data.
+3. **Locale scaffolding.** Add an Explorer action to create schema-based RESX files for selected cultures. Offer to copy string values from the neutral file as a starting point. Leave untranslated keys absent by default and protect existing files from overwrite.
+4. **Strongly typed C# resources.** Resolve the SDK-style C# project that owns the neutral resource. Preview a repeatable project XML change, then verify a clean build exposes the static resource class and resolves localized values.
