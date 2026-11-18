@@ -43,13 +43,18 @@ export function gridData(columns: GridColumn[]) {
 	return {
 		files: columns.map(({ fileName, culture, error }) => ({ fileName, culture, error })),
 		rows: [...keys].sort().map(key => {
-			const values = columns.map(column => column.resource?.entries.get(key)?.value);
+			const entries = columns.map(column => column.resource?.entries.get(key));
+			const values = entries.map(entry => entry?.value);
 			const firstText = values.find(value => value?.kind === 'text' && value.text.trim());
 			const neutral = columns[0]?.culture === undefined ? values[0] : undefined;
 			const reference = neutral?.kind === 'text' && !neutral.text.trim()
 				? firstText ?? neutral
 				: neutral ?? firstText ?? values.find(Boolean);
-			return { key, cells: values.map((value, index) => describeCell(value, reference, Boolean(columns[index].error))) };
+			const cells = values.map((value, index) => {
+				const cell = describeCell(value, reference, Boolean(columns[index].error));
+				return value?.kind === 'non-string' ? { ...cell, searchValue: entries[index]?.valueElement?.text } : cell;
+			});
+			return { key, cells };
 		}),
 	};
 }

@@ -43,7 +43,7 @@ function button(text, action) {
 function renderRows() {
 	const query = search.value.toLowerCase().trim();
 	const matching = state?.rows.filter(row => !query || row.key.toLowerCase().includes(query) ||
-		row.cells.some(cell => cell.text?.toLowerCase().includes(query))) ?? [];
+		row.cells.some(cell => (cell.text ?? cell.searchValue)?.toLowerCase().includes(query))) ?? [];
 	const fragment = document.createDocumentFragment();
 	for (const { key, cells } of matching) {
 		const row = node('tr');
