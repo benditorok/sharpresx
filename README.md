@@ -16,7 +16,7 @@ Right-click a folder or RESX file in Explorer and select **Create RESX Files**. 
 
 ## Configure the C# designer
 
-Right-click a RESX file and select **Configure Designer Generation**. Review the configuration for the neutral resource and apply it to the enclosing SDK-style `.csproj`. A normal `dotnet build` generates `ResourceFile.Designer.cs` in the project's intermediate output directory and compiles it into the project. The command supports standard embedded-resource naming and flags conflicting designer metadata before changing the project.
+Right-click a RESX file and select **Configure Designer Generation**. Review the configuration for the neutral resource and apply it to the enclosing SDK-style `.csproj`. A normal `dotnet build` generates `ResourceFile.Designer.cs` beside the neutral RESX so it can be tracked in Git. Run the command again to migrate an earlier netresx configuration that generated into the intermediate output directory. The command supports standard embedded-resource naming and flags conflicting designer metadata before changing the project.
 
 ## Development
 

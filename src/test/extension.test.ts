@@ -124,14 +124,21 @@ suite('RESX resource grid', () => {
 `;
 		const relative = 'AppResources/Labels.resx';
 		const plan = designerProjectEdit(project, relative);
-		assert.ok(plan.edit);
-		const configured = apply(project, [plan.edit]);
+		assert.ok(plan.edits.length);
+		const configured = apply(project, plan.edits);
 		assert.equal(configured.match(/<EmbeddedResource/g)?.length, 1);
 		assert.match(configured, /<Generator>MSBuild:Compile<\/Generator>/);
-		assert.match(configured, /<StronglyTypedFileName>\$\(IntermediateOutputPath\)Labels\.Designer\.cs<\/StronglyTypedFileName>/);
+		assert.match(configured, /<StronglyTypedFileName>AppResources\/Labels\.Designer\.cs<\/StronglyTypedFileName>/);
 		assert.match(configured, /<StronglyTypedNamespace>\$\(RootNamespace\)\.AppResources<\/StronglyTypedNamespace>/);
 		assert.match(configured, /<!-- Keep this comment -->/);
-		assert.equal(designerProjectEdit(configured, relative).edit, undefined);
+		assert.match(configured, /<Compile Remove="AppResources\/Labels\.Designer\.cs"/);
+		assert.deepEqual(designerProjectEdit(configured, relative).edits, []);
+		const oldOutput = configured.replace('>AppResources/Labels.Designer.cs<', '>$(IntermediateOutputPath)Labels.Designer.cs<')
+			.replace(/^.*<Compile Remove=.*\n/m, '');
+		const migrated = apply(oldOutput, designerProjectEdit(oldOutput, relative).edits);
+		assert.match(migrated, /<StronglyTypedFileName>AppResources\/Labels\.Designer\.cs<\/StronglyTypedFileName>/);
+		assert.equal(migrated.match(/<Compile Remove=/g)?.length, 1);
+		assert.deepEqual(designerProjectEdit(migrated, relative).edits, []);
 		assert.throws(() => designerProjectEdit(project.replace('Update=', 'Remove='), relative), /already be included/);
 		const legacy = configured.replace('MSBuild:Compile', 'ResXFileCodeGenerator');
 		assert.throws(() => designerProjectEdit(legacy, relative), /different Generator/);

@@ -1,7 +1,7 @@
 import * as path from 'node:path';
 import * as vscode from 'vscode';
 import { findResourceFamily } from './resx';
-import { appendXmlChild, escapeXml, readXml, type XmlElement } from './xml';
+import { appendXmlChild, escapeXml, readXml, type XmlEdit, type XmlElement } from './xml';
 
 function isNamed(element: XmlElement, name: string): boolean {
 	return element.name.toLowerCase() === name.toLowerCase();
@@ -33,7 +33,8 @@ export function designerProjectEdit(xml: string, relativePath: string) {
 	}
 	const className = segments.pop()!;
 	const namespace = '$(RootNamespace)' + (segments.length ? '.' + segments.join('.') : '');
-	const output = '$(IntermediateOutputPath)' + stem + '.Designer.cs';
+	const output = relativePath.slice(0, -'.resx'.length) + '.Designer.cs';
+	const previousOutput = '$(IntermediateOutputPath)' + stem + '.Designer.cs';
 	const metadata = {
 		Generator: 'MSBuild:Compile',
 		StronglyTypedLanguage: 'CSharp',
@@ -41,8 +42,9 @@ export function designerProjectEdit(xml: string, relativePath: string) {
 		StronglyTypedClassName: className,
 		StronglyTypedNamespace: namespace,
 	};
-	const entries = root.children.filter(group => isNamed(group, 'ItemGroup')).flatMap(group =>
-		group.children.filter(item => isNamed(item, 'EmbeddedResource')).map(item => ({ item, group })));
+	const items = root.children.filter(group => isNamed(group, 'ItemGroup')).flatMap(group =>
+		group.children.map(item => ({ item, group })));
+	const entries = items.filter(({ item }) => isNamed(item, 'EmbeddedResource'));
 	const matches = entries.filter(({ item }) =>
 		itemPath(item.attributes.Include) === relativePath || itemPath(item.attributes.Update) === relativePath);
 	const properties = root.children.filter(group => isNamed(group, 'PropertyGroup')).flatMap(group => group.children);
@@ -68,23 +70,53 @@ export function designerProjectEdit(xml: string, relativePath: string) {
 		throw new Error(`Another resource uses the generated file ${stem}.Designer.cs.`);
 	}
 
+	// GenerateResource adds its output to Compile during normal builds. Keep the file
+	// available to IDE analysis when design-time builds skip resource generation.
+	const buildCondition = "'$(DesignTimeBuild)' != 'true'";
+	const compileItems = items.filter(({ item }) => isNamed(item, 'Compile'));
+	// A later explicit Include can re-add the file after an earlier Remove.
+	const lastCompileItem = compileItems.reverse().find(({ item }) =>
+		itemPath(item.attributes.Remove) === output || itemPath(item.attributes.Include) === output);
+	const needsExclusion = !lastCompileItem || itemPath(lastCompileItem.item.attributes.Remove) !== output ||
+		Boolean(lastCompileItem.group.attributes.Condition) ||
+		(Boolean(lastCompileItem.item.attributes.Condition) && lastCompileItem.item.attributes.Condition !== buildCondition);
+	const compileLine = `<Compile Remove="${escapeXml(output, true)}" Condition="${buildCondition}" />`;
+
+	const edits: XmlEdit[] = [];
 	const lines: string[] = [];
+	let migratedLine: string | undefined;
 	for (const [name, value] of Object.entries(metadata)) {
 		const present = existing && property(existing, name);
-		if (present !== undefined && (name === 'StronglyTypedFileName' ? itemPath(present) : present) !== value) {
-			throw new Error(`The resource already specifies different ${name} metadata.`);
-		}
+		const normalized = name === 'StronglyTypedFileName' ? itemPath(present) : present;
+		const line = `<${name}>${escapeXml(value)}</${name}>`;
 		if (present === undefined) {
-			lines.push(`<${name}>${escapeXml(value)}</${name}>`);
+			lines.push(line);
+		} else if (normalized !== value) {
+			const previous = name === 'StronglyTypedFileName' && normalized === previousOutput
+				? existing?.children.find(child => isNamed(child, name) && !child.attributes.Condition)
+				: undefined;
+			if (!previous || previous.selfClosing || previous.children.length ||
+				Object.keys(existing!.attributes).some(attribute => attribute.toLowerCase() === name.toLowerCase())) {
+				throw new Error(`The resource already specifies different ${name} metadata.`);
+			}
+			edits.push({ start: previous.openEnd, end: previous.closeStart, text: escapeXml(value) });
+			migratedLine = line;
 		}
 	}
+
 	const itemLine = `<EmbeddedResource ${existing?.attributes.Include ? 'Include' : 'Update'}="${escapeXml(relativePath, true)}">`;
-	const preview = [itemLine, ...lines.map(line => '  ' + line), '</EmbeddedResource>'].join('\n');
-	const edit = !lines.length ? undefined : existing
-		? appendXmlChild(xml, existing, lines)
-		: appendXmlChild(xml, root, ['<ItemGroup>', '  ' + itemLine, ...lines.map(line => '    ' + line),
-			'  </EmbeddedResource>', '</ItemGroup>']);
-	return { edit, preview, dependentConvention };
+	const previewLines = lines.concat(migratedLine ?? []);
+	const resourcePreview = previewLines.length ? [itemLine, ...previewLines.map(line => '  ' + line), '</EmbeddedResource>'] : [];
+	const preview = [...(needsExclusion ? [compileLine] : []), ...resourcePreview].join('\n');
+	if (existing && lines.length) {
+		edits.push(appendXmlChild(xml, existing, lines));
+	}
+	const groupLines = [...(needsExclusion ? [compileLine] : []), ...(existing ? [] : resourcePreview)];
+	if (groupLines.length) {
+		edits.push(appendXmlChild(xml, root, ['<ItemGroup>', ...groupLines.map(line => '  ' + line), '</ItemGroup>']));
+	}
+	const outputAlreadyConfigured = itemPath(existing && property(existing, 'StronglyTypedFileName')) === output;
+	return { edits, preview, dependentConvention, outputAlreadyConfigured };
 }
 
 async function findProject(folder: vscode.Uri, boundary?: vscode.Uri): Promise<vscode.Uri | undefined> {
@@ -142,12 +174,12 @@ export async function configureDesigner(uri?: vscode.Uri) {
 		const version = document.version;
 		const wasDirty = document.isDirty;
 		const plan = designerProjectEdit(document.getText(), relative);
-		if (!plan.edit) {
+		if (!plan.edits.length) {
 			void vscode.window.showInformationMessage(`Designer generation is already configured for ${neutral.fileName}.`);
 			return;
 		}
-		if (await hasFile(vscode.Uri.joinPath(folder, family.name + '.Designer.cs'))) {
-			throw new Error('A source-tree Designer.cs already exists. Review its project setup to avoid compiling duplicate classes.');
+		if (!plan.outputAlreadyConfigured && await hasFile(vscode.Uri.joinPath(folder, family.name + '.Designer.cs'))) {
+			throw new Error('A Designer.cs already exists beside this resource. Review it before configuring MSBuild to generate that file.');
 		}
 		if (plan.dependentConvention && await hasFile(vscode.Uri.joinPath(folder, family.name + '.cs'))) {
 			throw new Error('A matching C# source file may change the resource manifest name. Review the project metadata first.');
@@ -162,9 +194,10 @@ export async function configureDesigner(uri?: vscode.Uri) {
 		if (document.isClosed || document.version !== version) {
 			throw new Error('The project changed during the preview. Run the command again.');
 		}
-		const { start, end, text } = plan.edit;
 		const edit = new vscode.WorkspaceEdit();
-		edit.replace(project, new vscode.Range(document.positionAt(start), document.positionAt(end)), text);
+		for (const { start, end, text } of plan.edits) {
+			edit.replace(project, new vscode.Range(document.positionAt(start), document.positionAt(end)), text);
+		}
 		if (!await vscode.workspace.applyEdit(edit)) {
 			throw new Error('VS Code could not update the project.');
 		}
