@@ -3,6 +3,7 @@ import * as fs from 'node:fs/promises';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import * as vscode from 'vscode';
+import { designerProjectEdit } from '../designer';
 import { gridData, renderGrid } from '../grid';
 import { deleteResource, findResourceFamily, readResx, setResource, sortResources } from '../resx';
 import { scaffoldResx } from '../scaffold';
@@ -96,6 +97,30 @@ suite('RESX resource grid', () => {
 		const seeded = readResx(scaffoldResx(neutral));
 		assert.deepEqual([...seeded.entries.keys()], ['Greeting']);
 		assert.deepEqual(seeded.entries.get('Greeting')?.value, { kind: 'text', text: ' < & ' });
+	});
+
+	test('configures automatic Designer.cs generation without duplicating project items', () => {
+		const project = `<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><TargetFramework>net10.0</TargetFramework></PropertyGroup>
+  <ItemGroup>
+    <!-- Keep this comment -->
+    <EmbeddedResource Update="AppResources/Labels.resx" />
+  </ItemGroup>
+</Project>
+`;
+		const relative = 'AppResources/Labels.resx';
+		const plan = designerProjectEdit(project, relative);
+		assert.ok(plan.edit);
+		const configured = apply(project, [plan.edit]);
+		assert.equal(configured.match(/<EmbeddedResource/g)?.length, 1);
+		assert.match(configured, /<Generator>MSBuild:Compile<\/Generator>/);
+		assert.match(configured, /<StronglyTypedFileName>\$\(IntermediateOutputPath\)Labels\.Designer\.cs<\/StronglyTypedFileName>/);
+		assert.match(configured, /<StronglyTypedNamespace>\$\(RootNamespace\)\.AppResources<\/StronglyTypedNamespace>/);
+		assert.match(configured, /<!-- Keep this comment -->/);
+		assert.equal(designerProjectEdit(configured, relative).edit, undefined);
+		assert.throws(() => designerProjectEdit(project.replace('Update=', 'Remove='), relative), /already be included/);
+		const legacy = configured.replace('MSBuild:Compile', 'ResXFileCodeGenerator');
+		assert.throws(() => designerProjectEdit(legacy, relative), /different Generator/);
 	});
 
 	test('opens and reuses a side-by-side panel from the command', async () => {

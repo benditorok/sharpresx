@@ -23,6 +23,11 @@
         "command": "netresx.createResourceFiles",
         "title": "Create RESX Files",
         "category": "RESX"
+      },
+      {
+        "command": "netresx.configureDesigner",
+        "title": "Configure Designer Generation",
+        "category": "RESX"
       }
     ],
     "menus": {
@@ -41,12 +46,21 @@
         {
           "command": "netresx.createResourceFiles",
           "when": "resourceExtname == .resx && isFileSystemResource"
+        },
+        {
+          "command": "netresx.configureDesigner",
+          "when": "resourceExtname == .resx && isFileSystemResource"
         }
       ],
       "explorer/context": [
         {
           "command": "netresx.createResourceFiles",
           "when": "isFileSystemResource && (explorerResourceIsFolder || resourceExtname == .resx)",
+          "group": "2_workspace"
+        },
+        {
+          "command": "netresx.configureDesigner",
+          "when": "resourceExtname == .resx && isFileSystemResource",
           "group": "2_workspace"
         }
       ]
