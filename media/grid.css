@@ -1,0 +1,65 @@
+body {
+	margin: 0;
+	padding: 1rem;
+}
+
+.table-wrapper {
+	overflow: auto;
+	max-block-size: calc(100vh - 2rem);
+}
+
+.table-wrapper:focus-visible {
+	outline: 1px solid var(--vscode-focusBorder);
+	outline-offset: -1px;
+}
+
+table {
+	min-inline-size: 100%;
+	border-collapse: separate;
+	border-spacing: 0;
+	text-align: start;
+}
+
+caption {
+	text-align: start;
+}
+
+h1 {
+	margin: 0 0 0.75rem;
+	font-size: 1.35em;
+}
+
+th,
+td {
+	min-inline-size: 11rem;
+	max-inline-size: 28rem;
+	padding: 0.5rem 0.75rem;
+	border-block-end: 1px solid var(--vscode-editorGroup-border);
+	vertical-align: top;
+	text-align: start;
+	overflow-wrap: anywhere;
+}
+
+thead {
+	position: sticky;
+	inset-block-start: 0;
+	z-index: 1;
+	background: var(--vscode-editor-background);
+}
+
+thead th:first-child,
+tbody th {
+	position: sticky;
+	inset-inline-start: 0;
+	background: var(--vscode-editor-background);
+	border-inline-end: 1px solid var(--vscode-editorGroup-border);
+}
+
+.translation {
+	white-space: pre-wrap;
+}
+
+.status {
+	color: var(--vscode-descriptionForeground);
+	font-style: italic;
+}

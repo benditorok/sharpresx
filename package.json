@@ -14,10 +14,27 @@
   "contributes": {
     "commands": [
       {
-        "command": "netresx.helloWorld",
-        "title": "Hello World"
+        "command": "netresx.openTranslationGrid",
+        "title": "Open Translation Grid",
+        "category": "RESX",
+        "icon": "$(table)"
       }
-    ]
+    ],
+    "menus": {
+      "editor/title": [
+        {
+          "command": "netresx.openTranslationGrid",
+          "when": "resourceExtname == .resx && isFileSystemResource",
+          "group": "navigation"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "netresx.openTranslationGrid",
+          "when": "resourceExtname == .resx && isFileSystemResource"
+        }
+      ]
+    }
   },
   "scripts": {
     "vscode:prepublish": "pnpm run package",
@@ -48,5 +65,8 @@
   "overrides": {
     "diff": "^8.0.4",
     "serialize-javascript": "^7.0.6"
+  },
+  "dependencies": {
+    "saxes": "^6.0.0"
   }
 }
