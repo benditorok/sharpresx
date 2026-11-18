@@ -193,6 +193,7 @@ function renderRows() {
 
 function renderState() {
 	const columns = ['Key', ...state.files.map(file => file.culture ?? 'Default')];
+	table.style.setProperty('--grid-column-count', String(columns.length));
 	headers.replaceChildren(...columns.map(label => {
 		const column = node('th', label);
 		column.scope = 'col';

@@ -94,6 +94,7 @@ input::placeholder {
 	flex: 1;
 	min-block-size: 0;
 	overflow: auto;
+	scrollbar-gutter: stable;
 }
 
 :where(button, input, textarea, .table-wrapper):focus-visible {
@@ -102,15 +103,14 @@ input::placeholder {
 }
 
 table {
-	min-inline-size: 100%;
+	table-layout: fixed;
+	inline-size: max(100%, calc(8rem * var(--grid-column-count, 1)));
 	border-collapse: separate;
 	border-spacing: 0;
 }
 
 th,
 td {
-	min-inline-size: 8rem;
-	max-inline-size: 25rem;
 	padding: 1px 0.5rem;
 	border-block-end: 1px solid var(--vscode-editorGroup-border);
 	vertical-align: middle;
