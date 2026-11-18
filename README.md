@@ -36,5 +36,3 @@ You can also install the generated package in VS Code using **Extensions: Instal
 ## Development
 
 Open the checkout in VS Code and press **F5** to launch the Extension Development Host. Run `pnpm run compile` for a type check, lint, and build, or `pnpm test` for the extension tests.
-
-The build uses TypeScript 7. ESLint uses the TypeScript 6 compatibility API.
