@@ -1,8 +1,12 @@
 {
   "name": "sharpresx",
   "displayName": "SharpResX",
-  "description": "dotnet .resx editor",
+  "description": "Edit .NET RESX resource files side by side in VS Code.",
   "version": "0.0.1",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/benditorok/sharpresx.git"
+  },
   "engines": {
     "vscode": "^1.146.0"
   },
@@ -11,6 +15,11 @@
   ],
   "activationEvents": [],
   "main": "./dist/extension.js",
+  "files": [
+    "dist/extension.js",
+    "media/grid.css",
+    "media/grid.js"
+  ],
   "contributes": {
     "commands": [
       {
@@ -105,13 +114,10 @@
     "eslint": "^10.5.0",
     "esbuild": "^0.28.1",
     "npm-run-all": "^4.1.5",
-    "typescript": "^6.0.3",
+    "typescript": "npm:@typescript/typescript6@^6.0.2",
     "@vscode/test-cli": "^0.0.15",
-    "@vscode/test-electron": "^3.0.0"
-  },
-  "overrides": {
-    "diff": "^8.0.4",
-    "serialize-javascript": "^7.0.6"
+    "@vscode/test-electron": "^3.0.0",
+    "typescript-compiler": "npm:typescript@^7.0.2"
   },
   "dependencies": {
     "saxes": "^6.0.0"

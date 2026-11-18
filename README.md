@@ -19,13 +19,22 @@ Right-click a folder or RESX file in Explorer and select **Create RESX Files**. 
 
 Right-click a RESX file and select **Configure Designer Generation**. Review the configuration for the neutral resource and apply it to the enclosing SDK-style `.csproj`. A normal `dotnet build` generates `ResourceFile.Designer.cs` beside the neutral RESX so it can be tracked in Git. Run the command again to migrate an earlier configuration that generated into the intermediate output directory. The command supports standard embedded-resource naming and flags conflicting designer metadata before changing the project.
 
+## Install from source
+
+Use Node.js 24 or newer, pnpm 12, and VS Code 1.146 or newer. Run these commands from a terminal with the VS Code `code` command on your PATH.
+
+```sh
+git clone https://github.com/benditorok/sharpresx.git
+cd sharpresx
+pnpm install --frozen-lockfile
+pnpm dlx @vscode/vsce@4.1.1 package --no-dependencies --skip-license --out sharpresx.vsix
+code --install-extension sharpresx.vsix
+```
+
+You can also install the generated package in VS Code using **Extensions: Install from VSIX…**.
+
 ## Development
 
-Run `pnpm install`, then press **F5** to launch the Extension Development Host with the TypeScript and esbuild watchers. The webview uses HTML, CSS, and JavaScript. Use `pnpm run compile` for a one-off type check, lint, and build.
+Open the checkout in VS Code and press **F5** to launch the Extension Development Host. Run `pnpm run compile` for a type check, lint, and build, or `pnpm test` for the extension tests.
 
-## Roadmap
-
-- [x] **Grid navigation and validation.** Open a compact grid in its own editor tab, search resource keys and values across locales, and flag missing entries, blank values, and mismatched .NET format placeholders.
-- [x] **Grid editing and organization.** Add empty keys to the neutral resource, edit values inline, duplicate or delete selected keys, and sort entries by key. Use targeted VS Code edits, refresh from file changes, and reject edits made against stale data.
-- [x] **Locale scaffolding.** Add an Explorer action to create schema-based RESX files for selected cultures. Offer to copy string values from the neutral file as a starting point. Leave untranslated keys absent by default and protect existing files from overwrite.
-- [x] **Strongly typed C# resources.** Resolve the SDK-style C# project that owns the neutral resource. Preview a repeatable project XML change, then verify a clean build exposes the static resource class and resolves localized values.
+The build uses TypeScript 7. ESLint uses the TypeScript 6 compatibility API.
