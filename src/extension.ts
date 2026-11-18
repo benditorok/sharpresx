@@ -2,6 +2,7 @@ import * as path from 'node:path';
 import * as vscode from 'vscode';
 import { gridData, renderGrid, type GridColumn } from './grid';
 import { deleteResource, findResourceFamily, listResourceFiles, readResx, setResource, sortResources } from './resx';
+import { createResourceFiles } from './scaffold';
 import type { XmlEdit } from './xml';
 
 interface OpenColumn extends GridColumn {
@@ -226,6 +227,7 @@ function attachGrid(panel: vscode.WebviewPanel, folder: vscode.Uri, family: stri
 export function activate(context: vscode.ExtensionContext) {
 	const panels = new Map<string, ReturnType<typeof attachGrid>>();
 	const media = vscode.Uri.joinPath(context.extensionUri, 'media');
+	context.subscriptions.push(vscode.commands.registerCommand('netresx.createResourceFiles', createResourceFiles));
 
 	context.subscriptions.push(vscode.commands.registerCommand('netresx.openTranslationGrid', async (uri?: vscode.Uri) => {
 		const resource = uri ?? vscode.window.activeTextEditor?.document.uri;

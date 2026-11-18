@@ -8,6 +8,10 @@ For example, opening `AppResources/Labels.hu.resx` shows keys from `Labels.resx`
 - Click a value to edit it. **Add key** writes entries to the files for which you provide a value. **Delete** removes the key across the family after confirmation.
 - **Sort files by key** reorders resource entries in each file. **Save files** saves the edited RESX documents through VS Code.
 
+## Create RESX files
+
+Right-click a folder or RESX file in Explorer and select **Create RESX Files**. Enter cultures such as `en, hu, pt-BR`. Starting from a folder also creates the default file if needed. When a neutral file is available, you can copy its string values or leave entries missing for .NET fallback. The command skips existing files.
+
 ## Development
 
 Run `pnpm install`, then press **F5** to launch the Extension Development Host with the TypeScript and esbuild watchers. The webview uses HTML, CSS, and JavaScript. Use `pnpm run compile` for a one-off type check, lint, and build.

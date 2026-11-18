@@ -5,6 +5,7 @@ import * as path from 'node:path';
 import * as vscode from 'vscode';
 import { gridData, renderGrid } from '../grid';
 import { deleteResource, findResourceFamily, readResx, setResource, sortResources } from '../resx';
+import { scaffoldResx } from '../scaffold';
 import type { XmlEdit } from '../xml';
 
 function apply(xml: string, edits: XmlEdit[]): string {
@@ -83,6 +84,18 @@ suite('RESX resource grid', () => {
 		const empty = '<root />';
 		const filled = apply(empty, setResource(empty, readResx(empty), 'Empty', ''));
 		assert.deepEqual(readResx(filled).entries.get('Empty')?.value, { kind: 'text', text: '' });
+	});
+
+	test('scaffolds schema-backed RESX files with optional string values', () => {
+		const blank = scaffoldResx();
+		assert.match(blank, /<xsd:schema/);
+		assert.match(blank, /<resheader name="version"><value>2.0<\/value><\/resheader>/);
+		assert.equal(readResx(blank).entries.size, 0);
+		const neutral = readResx('<root><data name="Greeting"><value> &lt; &amp; </value></data>' +
+			'<data name="Count" type="System.Int32"><value>42</value></data></root>');
+		const seeded = readResx(scaffoldResx(neutral));
+		assert.deepEqual([...seeded.entries.keys()], ['Greeting']);
+		assert.deepEqual(seeded.entries.get('Greeting')?.value, { kind: 'text', text: ' < & ' });
 	});
 
 	test('opens and reuses a side-by-side panel from the command', async () => {

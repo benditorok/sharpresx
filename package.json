@@ -18,6 +18,11 @@
         "title": "Open Translation Grid",
         "category": "RESX",
         "icon": "$(table)"
+      },
+      {
+        "command": "netresx.createResourceFiles",
+        "title": "Create RESX Files",
+        "category": "RESX"
       }
     ],
     "menus": {
@@ -32,6 +37,17 @@
         {
           "command": "netresx.openTranslationGrid",
           "when": "resourceExtname == .resx && isFileSystemResource"
+        },
+        {
+          "command": "netresx.createResourceFiles",
+          "when": "resourceExtname == .resx && isFileSystemResource"
+        }
+      ],
+      "explorer/context": [
+        {
+          "command": "netresx.createResourceFiles",
+          "when": "isFileSystemResource && (explorerResourceIsFolder || resourceExtname == .resx)",
+          "group": "2_workspace"
         }
       ]
     }
